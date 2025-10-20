@@ -1,0 +1,32 @@
+{
+  "id": "tpl1",
+  "slug": "camila-blockchain-financas",
+  "display_name": "Camila Matos",
+  "headline": "Finanças pessoais, cripto e renda passiva sem complicação",
+  "short_bio": "Educadora financeira para iniciantes. Acompanha macro, FII e blockchain para diversificação responsável. Conteúdo prático, planilhas e análises semanais.",
+  "city": "Lisboa",
+  "sector": "financas",
+  "tags": ["financas", "investimentos", "renda-passiva", "blockchain", "cripto", "fii"],
+  "avatar_url": "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=600&q=80",
+  "hero_url": "https://images.unsplash.com/photo-1518186233392-c232efbf2373?auto=format&fit=crop&w=1600&q=80",
+  "status": "published",
+  "updated_at": "2025-10-16T00:00:00.000Z",
+  "photos": [
+    "https://images.unsplash.com/photo-1518779578993-ec3579fee39f?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1556157382-97eda2d62296?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1517433456452-f9633a875f6f?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1485827404703-89b55fcc595e?auto=format&fit=crop&w=1200&q=80",
+    "https://images.unsplash.com/photo-1504639725590-34d0984388bd?auto=format&fit=crop&w=1200&q=80"
+  ],
+  "quiz": {
+    "title": "Quiz — Finanças & Cripto",
+    "questions": [
+      { "q": "Qual perfil de risco você foca no conteúdo?", "options": ["Conservador", "Moderado", "Agressivo"], "correctIndex": 1 },
+      { "q": "Horizonte de investimento preferido?", "options": ["Curto", "Médio", "Longo prazo"], "correctIndex": 2 },
+      { "q": "Qual métrica acompanha toda semana?", "options": ["IPCA", "Selic", "Dominância BTC"], "correctIndex": 1 }
+    ]
+  }
+}

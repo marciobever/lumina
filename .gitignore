@@ -1,0 +1,12 @@
+# dependencies
+/node_modules
+
+# next
+/.next
+/out
+
+# env
+.env*
+
+# OS
+.DS_Store

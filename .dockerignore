@@ -1,0 +1,30 @@
+# Node / package managers
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-lock.yaml
+.pnpm-store
+
+# Next.js
+.next/cache
+.next/standalone/cache
+.next/static/media/**.map
+
+# Build outputs
+dist
+out
+coverage
+
+# Env & local
+.env
+.env.*
+!.env.example
+
+# VCS / editors
+.git
+.gitignore
+.gitattributes
+.vscode
+.idea
+.DS_Store
