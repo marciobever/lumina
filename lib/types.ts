@@ -241,7 +241,7 @@ export function toViewModel(input: Profile | ProfileExtended, extras: {
   const tags = Array.isArray(p.tags) ? p.tags : Array.isArray(p.keywords) ? p.keywords! : []
 
   const article = parseMaybe<ArticleData>(p.article ?? null, {}) || {}
-  const seo = parseMaybe<SEOData>(p.seo ?? null, null)
+  const seo = parseMaybe<SEOData | null>(p.seo ?? null, null) // <- fix: permite null
   const quizRaw = extras.quizFromApi ?? p.quiz ?? null
 
   return {
@@ -271,10 +271,12 @@ export function toViewModel(input: Profile | ProfileExtended, extras: {
       tips: Array.isArray(article?.tips) ? article.tips : [],
       cta: article?.cta ?? null,
     },
-    seo: seo && typeof seo !== 'string' ? {
-      meta_title: (seo as any)?.meta_title,
-      meta_description: (seo as any)?.meta_description,
-    } : null,
+    seo: seo && typeof seo !== 'string'
+      ? {
+          meta_title: (seo as any)?.meta_title,
+          meta_description: (seo as any)?.meta_description,
+        }
+      : null,
     quiz: normalizeQuiz(quizRaw),
   }
 }
