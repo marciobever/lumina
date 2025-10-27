@@ -1,4 +1,7 @@
 // app/api/profiles/generate/route.ts
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+
 import { NextResponse } from 'next/server'
 import { triggerN8nGenerateProfile } from '@/lib/n8n'
 
