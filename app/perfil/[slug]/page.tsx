@@ -1,7 +1,7 @@
 // app/perfil/[slug]/page.tsx
 import { notFound } from 'next/navigation'
 import Script from 'next/script'
-import AdSlot from '@/components/AdSlot'
+// import AdSlot from '@/components/AdSlot' // removido
 
 import ProfileHeader from '@/components/ProfileHeader'
 import ProfileAbout from '@/components/ProfileAbout'
@@ -18,7 +18,6 @@ import {
 
 export const revalidate = 60
 
-/* ================== helpers ================== */
 const sectorLabel: Record<string, string> = {
   financas: 'Finanças',
   arquitetura: 'Arquitetura',
@@ -34,7 +33,6 @@ const sectorLabel: Record<string, string> = {
 const parseMaybe = <T,>(v: any, fallback: T): T => {
   if (v == null) return fallback
   if (typeof v === 'string') {
-    // Postgres text[] "{a,b,c}" → string[]
     if (v.startsWith('{') && v.endsWith('}')) {
       const arr = v
         .slice(1, -1)
@@ -42,23 +40,16 @@ const parseMaybe = <T,>(v: any, fallback: T): T => {
         .map((s) => s.trim().replace(/^"(.*)"$/, '$1'))
       return arr as unknown as T
     }
-    try {
-      return JSON.parse(v) as T
-    } catch {
-      return fallback
-    }
+    try { return JSON.parse(v) as T } catch { return fallback }
   }
   return v as T
 }
 
 type PhotoItem = { image_url: string; alt?: string }
-
-/* ---- URL guards ---- */
 const isGoodUrl = (u: any): u is string =>
   typeof u === 'string' && u.length > 6 && /^https?:\/\//i.test(u) && !u.includes('about:blank')
 const cleanUrls = (arr: any[]): string[] => (arr || []).map(String).filter(isGoodUrl)
 
-/** Garante grid cheio (8+) aceitando vários formatos de origem */
 function buildGallery(opts: {
   apiPhotos?: Array<PhotoItem | { url: string } | string> | null
   gallery_urls?: string[] | string | null
@@ -70,35 +61,29 @@ function buildGallery(opts: {
 }) {
   const { apiPhotos, gallery_urls, hero_url, avatar_url, cover_url, display_name, min = 8 } = opts
 
-  // normaliza apiPhotos → PhotoItem[]
   let fromApi: PhotoItem[] = []
   if (Array.isArray(apiPhotos)) {
-    fromApi = apiPhotos
-      .map((it: any, i: number) => {
-        if (!it) return null
-        if (typeof it === 'string' && isGoodUrl(it)) return { image_url: it, alt: `${display_name} — ${i + 1}` }
-        if (it.image_url && isGoodUrl(it.image_url)) return { image_url: String(it.image_url), alt: it.alt ?? `${display_name} — ${i + 1}` }
-        if (it.url && isGoodUrl(it.url)) return { image_url: String(it.url), alt: it.alt ?? `${display_name} — ${i + 1}` }
-        return null
-      })
-      .filter(Boolean) as PhotoItem[]
+    fromApi = apiPhotos.map((it: any, i: number) => {
+      if (!it) return null
+      if (typeof it === 'string' && isGoodUrl(it)) return { image_url: it, alt: `${display_name} — ${i + 1}` }
+      if (it.image_url && isGoodUrl(it.image_url)) return { image_url: String(it.image_url), alt: it.alt ?? `${display_name} — ${i + 1}` }
+      if (it.url && isGoodUrl(it.url)) return { image_url: String(it.url), alt: it.alt ?? `${display_name} — ${i + 1}` }
+      return null
+    }).filter(Boolean) as PhotoItem[]
   }
 
-  // normaliza gallery_urls (string JSON, text[] ou array)
   const galleryArr = parseMaybe<string[]>(gallery_urls ?? [], [])
   const fromGallery: PhotoItem[] = Array.isArray(galleryArr)
     ? cleanUrls(galleryArr).map((url, i) => ({ image_url: url, alt: `${display_name} — ${i + 1}` }))
     : []
 
-  // fallbacks (hero/avatar/cover) só se válidos
   const fallbacks = cleanUrls([hero_url, avatar_url, cover_url])
   let photos: PhotoItem[] =
-    fromApi.length > 0 ? fromApi
-    : fromGallery.length > 0 ? fromGallery
+      fromApi.length ? fromApi
+    : fromGallery.length ? fromGallery
     : fallbacks.length ? fallbacks.map((u, i) => ({ image_url: u, alt: `${display_name} — ${i + 1}` }))
     : []
 
-  // garante mínimo (repetindo ordenadamente)
   if (photos.length > 0 && photos.length < min) {
     const out: PhotoItem[] = []
     for (let i = 0; i < min; i++) out.push(photos[i % photos.length])
@@ -109,7 +94,6 @@ function buildGallery(opts: {
   return { photos, images }
 }
 
-/* ---------- Artigo fallback se o banco vier curto ou vazio ---------- */
 function buildFallbackArticle(p: any) {
   const name = p?.display_name ?? p?.name ?? p?.slug ?? 'Especialista'
   const set = p?.tags && Array.isArray(p.tags) ? p.tags.slice(0, 5) : []
@@ -117,33 +101,23 @@ function buildFallbackArticle(p: any) {
     hook:
       'Houve um tempo em que olhar para as finanças significava apertar o peito — até eu descobrir que organização é um ato de gentileza com o meu futuro.',
     content: [
-      {
-        type: 'paragraph',
-        text: `Lembro do domingo em que decidi trocar a culpa por curiosidade. Abri meu aplicativo do banco com um café do lado e me perguntei: o que esse extrato está tentando me contar sobre mim? Foi a primeira vez que dinheiro virou linguagem — não sentença.`,
-      },
-      {
-        type: 'paragraph',
-        text: `Comecei pequeno: 30 minutos semanais para revisar a última semana e desenhar a próxima. Nada de planilhas mirabolantes — só uma bússola que coubesse na vida real. O resultado? Menos ansiedade, mais clareza, e a liberdade de dizer “não” ao que não conversa com meus valores.`,
-      },
-      {
-        type: 'tips',
+      { type: 'paragraph',
+        text: `Lembro do domingo em que decidi trocar a culpa por curiosidade. Abri meu aplicativo do banco com um café do lado e me perguntei: o que esse extrato está tentando me contar sobre mim? Foi a primeira vez que dinheiro virou linguagem — não sentença.` },
+      { type: 'paragraph',
+        text: `Comecei pequeno: 30 minutos semanais para revisar a última semana e desenhar a próxima. Nada de planilhas mirabolantes — só uma bússola que coubesse na vida real.` },
+      { type: 'tips',
         items: [
-          'Use o 50/30/20 como esqueleto flexível (não como prisão).',
-          'Automatize aportes no dia do pagamento: o que importa vem antes do impulso.',
-          'Crie um ‘Diário de Gastos Emocionais’ por 7 dias — entenda seus gatilhos.',
-          'Dê nome aos objetivos e coloque data: o cérebro corre melhor quando enxerga a linha de chegada.',
-        ],
-      },
-      {
-        type: 'paragraph',
-        text: `Com ${name}, o papo sobre ${p?.sector ?? 'finanças'} é menos sobre fórmulas e mais sobre escolhas consistentes. ${set.map((t: string) => `#${t}`).join(' ')}`,
-      },
-      {
-        type: 'cta',
-        headline: 'Sua vida financeira é um roteiro original ou uma reprise?',
-        text: 'Descubra seu estilo de decisão e receba um plano leve para os próximos 30 dias.',
-        button: 'Fazer o Quiz',
-      },
+          'Use o 50/30/20 como esqueleto flexível.',
+          'Automatize aportes no dia do pagamento.',
+          'Diário de Gastos Emocionais por 7 dias.',
+          'Dê nome e data aos objetivos.',
+        ]},
+      { type: 'paragraph',
+        text: `Com ${name}, o papo sobre ${p?.sector ?? 'finanças'} é menos sobre fórmulas e mais sobre escolhas consistentes. ${set.map((t: string) => `#${t}`).join(' ')}` },
+      { type: 'cta',
+        headline: 'Seu roteiro financeiro é original?',
+        text: 'Descubra seu estilo e receba um plano leve para 30 dias.',
+        button: 'Fazer o Quiz' },
     ],
   }
 }
@@ -174,19 +148,8 @@ export async function generateMetadata({ params }: { params: { slug: string } })
     description: desc,
     alternates: { canonical },
     robots: { index: isPublished, follow: isPublished },
-    openGraph: {
-      type: 'profile',
-      url: canonical,
-      title,
-      description: desc,
-      images: image ? [{ url: image }] : undefined,
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title,
-      description: desc,
-      images: image ? [image] : undefined,
-    },
+    openGraph: { type: 'profile', url: canonical, title, description: desc, images: image ? [{ url: image }] : undefined },
+    twitter: { card: 'summary_large_image', title, description: desc, images: image ? [image] : undefined },
   }
 }
 
@@ -221,7 +184,6 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
   const slug = (p as any).slug
   const showAds = !!(p as any).exibir_anuncios
 
-  // JSON-LD
   const site = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com'
   const name = (p as any).display_name ?? (p as any).name ?? p.slug
   const jsonLd = {
@@ -236,7 +198,7 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
       jobTitle: p.sector || undefined,
       address: (p as any).city ? { '@type': 'PostalAddress', addressLocality: (p as any).city } : undefined,
       image: [ (p as any).hero_url, (p as any).avatar_url, p.cover_url ].filter(Boolean),
-      sameAs: [], // redes se houver
+      sameAs: [],
     },
     breadcrumb: {
       '@type': 'BreadcrumbList',
@@ -254,23 +216,24 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
       <Script id="ld-profile" type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* toggle sem JS: #quiz escondido até ser acionado por âncora */}
-      <style>{`
-        #quiz { display: none; }
-        #quiz:target { display: block; }
-      `}</style>
+      <style>{`#quiz{display:none} #quiz:target{display:block}`}</style>
 
-      {/* AD topo */}
+      {/* AD topo (placeholder GAM) */}
       {showAds && (
         <div className="container pt-8 pb-4">
-          <AdSlot
-            id="ad-leaderboard-top"
-            label=""
-            size="728x90"
-            variant="leaderboard"
-            slot={(p as any).ad_slot_topo}
-            width={728}
-            height={90}
-          />
+          <div className="w-full flex justify-center">
+            <div className="w-full max-w-[728px] flex flex-col items-center">
+              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
+              <div
+                id="LeaderboardTopo"
+                data-gam-slot={(p as any)?.ad_slot_topo || process.env.NEXT_PUBLIC_GAM_LEADERBOARD || ''}
+                className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
+                aria-label="Anúncio topo"
+              >
+                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -287,7 +250,7 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
         avatar_url={(p as any).avatar_url || (p as any).hero_url || p.cover_url || ''}
       />
 
-      {/* CTA WhatsApp — VISUAL do banner + OVERLAY de link para o Assistente */}
+      {/* CTA WhatsApp + overlay para Assistente */}
       <div className="container mt-6">
         <div className="relative">
           <WhatsAppBanner
@@ -296,11 +259,7 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
             subtitle="Consultas, parcerias e convites"
             text={`Oi, ${name}! Encontrei seu perfil no LUMINA e gostaria de conversar.`}
           />
-          <a
-            href={`/assistente/${encodeURIComponent(slug)}`}
-            className="absolute inset-0"
-            aria-label={`Abrir assistente de ${name}`}
-          />
+          <a href={`/assistente/${encodeURIComponent(slug)}`} className="absolute inset-0" aria-label={`Abrir assistente de ${name}`} />
         </div>
       </div>
 
@@ -320,10 +279,7 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
               {/* SOBRE */}
               <section className="card px-6 md:px-8 py-7 md:py-9" id="sobre">
                 <h2 className="text-2xl font-semibold text-white/95 mb-6">Sobre</h2>
-                <ProfileAbout
-                  text={(p as any).bio || (p as any).short_bio}
-                  tags={Array.isArray((p as any).tags) ? (p as any).tags.filter(Boolean) : []}
-                />
+                <ProfileAbout text={(p as any).bio || (p as any).short_bio} tags={Array.isArray((p as any).tags) ? (p as any).tags.filter(Boolean) : []} />
               </section>
 
               {/* EDITORIAL */}
@@ -331,25 +287,26 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
                 <ProfileEditorial article={article} />
               </section>
 
-              {/* Banner Ad no meio do conteúdo */}
+              {/* Banner Ad no meio (placeholder) */}
               {showAds && (
                 <div className="my-8 flex justify-center">
-                  <AdSlot
-                    id="ad-rectangle-mid"
-                    label="Publicidade"
-                    size="728x90"
-                    variant="leaderboard"
-                    slot={(p as any).ad_slot_meio}
-                    width={728}
-                    height={90}
-                  />
+                  <div className="w-full max-w-[728px] flex flex-col items-center">
+                    <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
+                    <div
+                      id="Content2"
+                      data-gam-slot={(p as any)?.ad_slot_meio || process.env.NEXT_PUBLIC_GAM_CONTENT2 || ''}
+                      className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
+                      aria-label="Anúncio meio"
+                    >
+                      <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                    </div>
+                  </div>
                 </div>
               )}
 
-              {/* QUIZ inline (abre via #quiz) */}
+              {/* QUIZ */}
               <section id="quiz" className="card px-6 md:px-8 py-7 md:py-9 scroll-mt-24">
                 <h2 className="text-2xl font-semibold text-white/95 mb-4">Verifique sua elegibilidade</h2>
-                {/* plug do InteractiveQuiz pode voltar aqui quando quiser */}
               </section>
 
               {/* GALERIA */}
@@ -361,11 +318,7 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
                       {images.slice(0, 8).map((src, i) => (
                         <figure key={i} className="gallery-item img-smooth aspect-square group overflow-hidden rounded-2xl">
                           <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
-                          <div
-                            className="gallery-img transition-transform duration-500 group-hover:scale-110"
-                            style={{ backgroundImage: `url("${src.replace(/"/g, '\\"')}")` }}
-                            aria-label={`Foto ${i + 1} — ${name}`}
-                          />
+                          <div className="gallery-img transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url("${src.replace(/"/g, '\\"')}")` }} aria-label={`Foto ${i + 1} — ${name}`} />
                         </figure>
                       ))}
                     </div>
@@ -387,29 +340,32 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
               ) : null}
             </div>
 
-            {/* Lateral (ads com altura fixa para evitar CLS) */}
+            {/* Lateral */}
             <aside className="hidden lg:block">
               <div className="sticky top-24 space-y-8">
                 {showAds && (
                   <>
-                    <AdSlot
-                      id="ad-skyscraper-profile"
-                      label=""
-                      size="300x600"
-                      variant="skyscraper"
-                      slot={(p as any).ad_slot_side}
-                      width={300}
-                      height={600}
-                    />
-                    <AdSlot
-                      id="ad-rectangle-side"
-                      label=""
-                      size="300x250"
-                      variant="leaderboard"
-                      slot={(p as any).ad_slot_rodape}
-                      width={300}
-                      height={250}
-                    />
+                    <div className="w-[300px]">
+                      <div
+                        id="SkyscraperProfile"
+                        data-gam-slot={(p as any)?.ad_slot_side || process.env.NEXT_PUBLIC_GAM_SKYSCRAPER || ''}
+                        className="w-[300px] h-[600px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
+                        aria-label="Anúncio lateral skyscraper"
+                      >
+                        <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                      </div>
+                    </div>
+
+                    <div className="w-[300px]">
+                      <div
+                        id="RectangleSide"
+                        data-gam-slot={(p as any)?.ad_slot_rodape || process.env.NEXT_PUBLIC_GAM_RECTANGLE || ''}
+                        className="w-[300px] h-[250px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
+                        aria-label="Anúncio lateral retângulo"
+                      >
+                        <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
@@ -418,18 +374,20 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
         </div>
       </div>
 
-      {/* Rodapé com anúncio */}
+      {/* Rodapé com anúncio (placeholder) */}
       {showAds && (
         <div className="mt-2 mb-10 flex justify-center">
-          <AdSlot
-            id="ad-rodape"
-            label=""
-            size="728x90"
-            variant="leaderboard"
-            slot={(p as any).ad_slot_rodape}
-            width={728}
-            height={90}
-          />
+          <div className="w-full max-w-[728px] flex flex-col items-center">
+            <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
+            <div
+              id="Content3"
+              data-gam-slot={(p as any)?.ad_slot_rodape || process.env.NEXT_PUBLIC_GAM_CONTENT3 || ''}
+              className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
+              aria-label="Anúncio rodapé"
+            >
+              <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+            </div>
+          </div>
         </div>
       )}
     </div>
