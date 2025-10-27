@@ -2,6 +2,7 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+import Script from 'next/script'
 import { listFeatured } from '@/lib/queries'
 import BackdropLines from '@/components/BackdropLines'
 import NeonHero from '@/components/NeonHero'
@@ -53,20 +54,65 @@ export default async function Page() {
             </button>
           </form>
 
-          {/* SLOT DE PUBLICIDADE (placeholder estilo WordPress/GAM) */}
+          {/* SLOT DE PUBLICIDADE (GAM — visual “bonitinho”) */}
           <div className="w-full flex justify-center mt-8">
             <div className="w-full max-w-[336px] flex flex-col items-center">
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
                 Publicidade
               </div>
+
               <div
                 id="Content1"
                 className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
               >
+                <span className="text-xs text-white/60">Carregando anúncio…</span>
                 <noscript>Ative o JavaScript para ver o anúncio.</noscript>
               </div>
             </div>
           </div>
+
+          {/* GPT loader + definição do slot (fixo aqui na page) */}
+          <Script
+            id="gpt-loader"
+            src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"
+            strategy="afterInteractive"
+          />
+          <Script id="gpt-slot-content1" strategy="afterInteractive">
+            {`
+              window.googletag = window.googletag || { cmd: [] };
+
+              googletag.cmd.push(function () {
+                // Evita reinit nas navegações
+                if (!window.__gptOnce) {
+                  window.__gptOnce = true;
+                  googletag.pubads().enableLazyLoad({
+                    fetchMarginPercent: 25,
+                    renderMarginPercent: 15,
+                    mobileScaling: 2.0
+                  });
+                  googletag.pubads().collapseEmptyDivs(true);
+                }
+
+                // Size mapping
+                var mapping = googletag.sizeMapping()
+                  .addSize([0, 0], ['fluid', [250,250], [300,250], [336,280]])
+                  .build();
+
+                // Definição do slot (ajuste o caminho se necessário)
+                googletag.defineSlot(
+                  '/23287346478/marciobevervanso.com/marciobevervanso.com_Content1',
+                  [[250,250],[300,250],[336,280],'fluid'],
+                  'Content1'
+                )
+                .defineSizeMapping(mapping)
+                .setCollapseEmptyDiv(true)
+                .addService(googletag.pubads());
+
+                googletag.enableServices();
+                googletag.display('Content1');
+              });
+            `}
+          </Script>
 
           {/* Dica de rolagem + respiro para empurrar a próxima seção abaixo da dobra */}
           <div className="text-center text-white/70 mt-6">
