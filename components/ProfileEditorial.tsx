@@ -37,8 +37,20 @@ const Tips = ({ title, items }: { title?: string; items: string[] }) => (
   </div>
 )
 
-/** CTA com suporte a href (default #quiz) para abrir o quiz embutido via :target */
-const Cta = ({ headline, text, button, href = "#quiz" }: { headline?: string; text?: string; button?: string; href?: string }) => (
+/** CTA com suporte a onClick (se vier) ou href (fallback #quiz) */
+const Cta = ({
+  headline,
+  text,
+  button,
+  href = "#quiz",
+  onClick,
+}: {
+  headline?: string
+  text?: string
+  button?: string
+  href?: string
+  onClick?: () => void
+}) => (
   <div
     className="mt-8 rounded-2xl p-6 text-center"
     style={{ background: "linear-gradient(45deg, rgba(var(--accent),0.10), rgba(var(--accent2),0.10))" }}
@@ -47,7 +59,13 @@ const Cta = ({ headline, text, button, href = "#quiz" }: { headline?: string; te
     {text && <p className="mt-3 mx-auto max-w-xl text-white/80 reading-loose">{text}</p>}
     {button && (
       <div className="mt-6">
-        <a href={href} className="btn btn-primary px-6">{button}</a>
+        {onClick ? (
+          <button type="button" onClick={onClick} className="btn btn-primary px-6">
+            {button}
+          </button>
+        ) : (
+          <a href={href} className="btn btn-primary px-6">{button}</a>
+        )}
       </div>
     )}
   </div>
@@ -120,10 +138,12 @@ function InlineQuiz({ questions }: { questions: MiniQ[] }) {
 
 export default function ProfileEditorial({
   article,
-  quiz, // <<— passe o quiz normalizado a partir da page (opcional)
+  quiz,              // opcional
+  onCtaClick,        // ⟵ opcional: abre modal/quiz externo se quiser
 }: {
   article: NormalizedArticle | null
   quiz?: { title?: string; description?: string; questions?: Array<{ id: string; title: string; options?: string[] }> } | null
+  onCtaClick?: () => void
 }) {
   if (!article || !Array.isArray(article.content) || article.content.length === 0) return null
 
@@ -136,7 +156,6 @@ export default function ProfileEditorial({
       case "paragraph": {
         const raw = String((block as ParagraphBlock).text ?? "").trim()
         if (!raw) break
-        // separa por linhas em branco e remove espaços
         const parts = raw.split(/\n{2,}/).map(s => s.trim()).filter(Boolean)
         parts.forEach((pText, pi) => {
           blocks.push(
@@ -153,8 +172,18 @@ export default function ProfileEditorial({
       }
       case "cta": {
         const b = block as CtaBlock
-        if (b.headline || b.text || b.button)
-          blocks.push(<Cta key={`c-${idx}`} headline={b.headline} text={b.text} button={b.button} href={(b as any).href ?? "#quiz"} />)
+        if (b.headline || b.text || b.button) {
+          blocks.push(
+            <Cta
+              key={`c-${idx}`}
+              headline={b.headline}
+              text={b.text}
+              button={b.button}
+              href={(b as any).href ?? "#quiz"}
+              onClick={onCtaClick}
+            />
+          )
+        }
         break
       }
       default:
