@@ -6,6 +6,9 @@ import { db } from "./supabaseServer"
 const PROFILES_TABLE = "profiles"
 const PHOTOS_TABLE   = "profile_photos"
 
+// ==============================
+// Tipagens
+// ==============================
 export type Profile = {
   id: string
   slug: string
@@ -35,7 +38,11 @@ export type Profile = {
 }
 
 export type Photo = { image_url: string; alt?: string }
+type AnyObj = Record<string, any>
 
+// ==============================
+// Helpers
+// ==============================
 function parsePgTextArray(v: unknown): string[] {
   if (Array.isArray(v)) return v.map(String)
   if (typeof v === "string" && v.startsWith("{") && v.endsWith("}")) {
@@ -44,7 +51,98 @@ function parsePgTextArray(v: unknown): string[] {
   return []
 }
 
+function nowIso() {
+  return new Date().toISOString()
+}
+function slugify(s: string) {
+  return String(s || "")
+    .normalize("NFD").replace(/\p{Diacritic}/gu, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
+
+function nocodbEnabled() {
+  return !!(process.env.NOCODB_BASE_URL && process.env.NOCODB_TABLE_ID && process.env.NOCODB_API_TOKEN)
+}
+function nocodbTableProfiles() {
+  return process.env.NOCODB_TABLE_ID as string
+}
+function nocodbTablePhotos() {
+  return (process.env.NOCODB_PHOTOS_TABLE_ID || "") as string
+}
+
+async function nocodbFetch(path: string, init?: RequestInit) {
+  const base = process.env.NOCODB_BASE_URL!
+  const token = process.env.NOCODB_API_TOKEN!
+  const url = `${base}${path}`
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
+      "xc-token": token,
+      "Authorization": `Bearer ${token}`,
+      ...(init?.headers || {}),
+    },
+    cache: "no-store",
+  })
+  if (!res.ok) {
+    const t = await res.text().catch(() => "")
+    throw new Error(`NocoDB ${res.status}: ${t || res.statusText}`)
+  }
+  try {
+    return await res.json()
+  } catch {
+    return {}
+  }
+}
+
+function mapRowToProfile(row: AnyObj): Profile {
+  const ts = nowIso()
+  const arr = (v: any) => (Array.isArray(v) ? v : v == null ? null : [String(v)])
+  return {
+    id: String(row.id ?? row.ID ?? row.uuid ?? row.slug ?? cryptoRandomId()),
+    slug: row.slug ?? slugify(row.display_name || "perfil"),
+    display_name: row.display_name ?? "(sem nome)",
+    title: row.title ?? null,
+    sector: row.sector ?? null,
+    city: row.city ?? null,
+    bio: row.bio ?? null,
+    headline: row.headline ?? null,
+    short_bio: row.short_bio ?? null,
+    cover_url: row.cover_url ?? null,
+    avatar_url: row.avatar_url ?? null,
+    hero_url: row.hero_url ?? null,
+    gallery_urls: arr(row.gallery_urls),
+    tags: arr(row.tags),
+    status: (row.status as any) || "draft",
+    exibir_anuncios: !!row.exibir_anuncios,
+    ad_slot_topo: row.ad_slot_topo ?? null,
+    ad_slot_meio: row.ad_slot_meio ?? null,
+    ad_slot_rodape: row.ad_slot_rodape ?? null,
+    article: row.article ?? null,
+    quiz: row.quiz ?? null,
+    seo: row.seo ?? null,
+    created_at: row.created_at ?? ts,
+    updated_at: row.updated_at ?? ts,
+    hero_photo_id: row.hero_photo_id ?? null,
+  }
+}
+function cryptoRandomId() {
+  return Math.random().toString(36).slice(2, 10)
+}
+
+// ==============================
+// Reads (NocoDB-first; Supabase fallback)
+// ==============================
 export async function getProfileBySlug(slug: string): Promise<Profile | null> {
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const q = encodeURIComponent(`(slug,eq,${slug})`)
+    const json = await nocodbFetch(`/api/v2/tables/${table}/records?where=${q}&limit=1`)
+    const row = json?.list?.[0] || null
+    return row ? mapRowToProfile(row) : null
+  }
+
   const supa = db()
   const { data, error } = await supa
     .from(PROFILES_TABLE)
@@ -53,10 +151,36 @@ export async function getProfileBySlug(slug: string): Promise<Profile | null> {
     .limit(1)
     .maybeSingle()
   if (error) throw error
-  return data as Profile | null
+  return (data as Profile) ?? null
 }
 
-export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
+export async function getProfilePhotos(profileId: string): Promise( Photo[] ) {
+  if (nocodbEnabled()) {
+    const tablePhotos = nocodbTablePhotos()
+    // Se não houver tabela de fotos, caímos para campos do perfil
+    if (tablePhotos) {
+      const q = encodeURIComponent(`(profile_id,eq,${profileId})`)
+      const json = await nocodbFetch(`/api/v2/tables/${tablePhotos}/records?where=${q}&sort=position,created_at`)
+      const list: AnyObj[] = json?.list ?? []
+      const normalized = list
+        .map((p: AnyObj, i: number) => ({
+          image_url: String(p.image_url || ""),
+          alt: p.alt ?? `Foto ${i + 1}`,
+        }))
+        .filter((p) => p.image_url && /^https?:\/\//i.test(p.image_url))
+      if (normalized.length) return normalized
+    }
+
+    // fallback para pegar do próprio perfil
+    const prof = await getProfileById(profileId)
+    if (!prof) return []
+    const name = prof.display_name
+    const urls = prof.gallery_urls || []
+    const base = urls.length ? urls : [prof.cover_url, prof.avatar_url].filter(Boolean) as string[]
+    return base.map((u, i) => ({ image_url: u, alt: `${name} — ${i + 1}` }))
+  }
+
+  // Supabase
   const supa = db()
 
   const { data: photos, error: photosErr } = await supa
@@ -93,6 +217,25 @@ export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
 }
 
 export async function getProfileQuiz(profileId: string) {
+  if (nocodbEnabled()) {
+    const prof = await getProfileById(profileId)
+    const q = (prof as any)?.quiz
+    if (!q) return null
+    if (Array.isArray(q)) {
+      return { title: "Quiz", questions: q.map((s: string) => ({ q: String(s) })) }
+    }
+    if (q?.questions && Array.isArray(q.questions)) {
+      return {
+        title: q.title ?? "Quiz",
+        description: q.description ?? "",
+        questions: q.questions.map((x: any) =>
+          typeof x === "string" ? { q: x } : { q: x.q ?? String(x), options: x.options ?? undefined }
+        ),
+      }
+    }
+    return null
+  }
+
   const supa = db()
   const { data, error } = await supa
     .from(PROFILES_TABLE)
@@ -119,6 +262,21 @@ export async function getProfileQuiz(profileId: string) {
 }
 
 export async function listSimilarProfiles(profileId: string, tags: string[] = [], limit = 6) {
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    // Pega últimos publicados e filtra no cliente (overlaps de tags)
+    const json = await nocodbFetch(`/api/v2/tables/${table}/records?limit=${limit * 4}&sort=-created_at`)
+    let list: AnyObj[] = (json?.list ?? []).filter((r: AnyObj) => String(r.id) !== String(profileId) && (r.status ?? "published") === "published")
+    if (tags?.length) {
+      const set = new Set(tags.map(String))
+      list = list.filter((r) => {
+        const rt = Array.isArray(r.tags) ? r.tags.map(String) : []
+        return rt.some((t: string) => set.has(String(t)))
+      })
+    }
+    return list.slice(0, limit).map(mapRowToProfile)
+  }
+
   const supa = db()
 
   if (!tags?.length) {
@@ -155,10 +313,44 @@ export type ListParams = {
 }
 
 export async function listProfiles(params: ListParams = {}) {
-  const supa = db()
   const page = Math.max(1, params.page ?? 1)
   const perPage = Math.min(50, Math.max(1, params.perPage ?? 12))
-  const from = (page - 1) * perPage
+  const offset = (page - 1) * perPage
+
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const where: string[] = []
+    if (params.q) {
+      const k = params.q.replace(/%/g, "")
+      // ilike aproximado: usamos múltiplas condições com OR não suportado fácil no v2, então trazemos mais e filtramos no cliente
+      where.push(encodeURIComponent(`(display_name,like,%25${k}%25)`))
+    }
+    if (params.sector) where.push(encodeURIComponent(`(sector,eq,${params.sector})`))
+    if (params.adsOnly) where.push(encodeURIComponent(`(exibir_anuncios,eq,true)`))
+    if (params.status) where.push(encodeURIComponent(`(status,eq,${params.status})`))
+
+    const whereStr = where.length ? `where=${where.join("&where=")}` : ""
+    const url = `/api/v2/tables/${table}/records?${whereStr}&limit=${perPage}&offset=${offset}&sort=-created_at`
+    const json = await nocodbFetch(url)
+    let data: AnyObj[] = json?.list ?? []
+    // filtro extra de q nos campos title/slug/city
+    if (params.q) {
+      const k = params.q.toLowerCase()
+      data = data.filter((r: AnyObj) =>
+        [r.display_name, r.title, r.slug, r.city].some((v) => String(v || "").toLowerCase().includes(k))
+      )
+    }
+
+    const total: number =
+      (json?.pageInfo?.totalRows as number) ??
+      (json?.list?.length ?? 0) + (json?.pageInfo?.page ?? 0) * perPage
+
+    return { data: data.map(mapRowToProfile) as Profile[], total: total || data.length, page, perPage }
+  }
+
+  // Supabase fallback
+  const supa = db()
+  const from = offset
   const to = from + perPage - 1
 
   let q = supa
@@ -189,6 +381,15 @@ export async function listProfiles(params: ListParams = {}) {
 }
 
 export async function listFeatured(limit = 12) {
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const json = await nocodbFetch(`/api/v2/tables/${table}/records?limit=${Math.max(1, Math.min(50, limit))}&sort=-created_at`)
+    const list: AnyObj[] = json?.list ?? []
+    const filtered = list.filter((r) => (r.status ?? "published") === "published")
+    const slice = filtered.slice(0, Math.max(1, Math.min(50, limit)))
+    return { data: slice.map(mapRowToProfile), total: slice.length }
+  }
+
   const supa = db()
   const { data, error } = await supa
     .from(PROFILES_TABLE)
@@ -200,31 +401,165 @@ export async function listFeatured(limit = 12) {
   return { data: data ?? [], total: data?.length ?? 0 }
 }
 
-// === deleteProfile (NocoDB primeiro; fallback Supabase) ===
-export async function deleteProfile(id: string) {
-  const base = process.env.NOCODB_BASE_URL;
-  const table = process.env.NOCODB_TABLE_ID;
-  const token = (process.env.NOCODB_API_TOKEN || "").trim();
+// ==============================
+// Writes / Mutations (NocoDB-first; Supabase fallback)
+// ==============================
+export async function createProfile(input: Partial<Profile>): Promise<Profile> {
+  const payload: AnyObj = { ...input }
 
-  if (base && table && token) {
-    const res = await fetch(`${base}/api/v2/tables/${table}/records/${id}`, {
-      method: "DELETE",
-      headers: {
-        "xc-token": token,
-        "Authorization": `Bearer ${token}`,
-      },
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`NocoDB error ${res.status}: ${txt || "sem corpo"}`);
-    }
-    return true;
+  const display_name = payload.display_name || "Novo Perfil"
+  const slug = payload.slug || slugify(display_name)
+  const ts = nowIso()
+
+  payload.display_name   = display_name
+  payload.slug           = slug
+  payload.status         = (payload.status as any) || "draft"
+  payload.exibir_anuncios = !!payload.exibir_anuncios
+  payload.created_at     = payload.created_at || ts
+  payload.updated_at     = ts
+
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const created = await nocodbFetch(`/api/v2/tables/${table}/records`, {
+      method: "POST",
+      body: JSON.stringify({ ...payload }),
+    })
+    const row = (created?.list?.[0] || created) as AnyObj
+    return mapRowToProfile(row)
   }
 
-  // Fallback: deleta no Supabase
+  const supa = db()
+  const { data, error } = await supa
+    .from(PROFILES_TABLE)
+    .insert([{ ...payload }])
+    .select("*")
+    .maybeSingle()
+  if (error) throw error
+  return data as Profile
+}
+
+export async function toggleAds(id: string, enabled: boolean): Promise<{ ok: true; profile?: Profile }> {
+  const ts = nowIso()
+
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const updated = await nocodbFetch(`/api/v2/tables/${table}/records/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ exibir_anuncios: !!enabled, updated_at: ts }),
+    })
+    const row = (updated?.list?.[0] || updated) as AnyObj
+    return { ok: true, profile: mapRowToProfile(row) }
+  }
+
+  const supa = db()
+  const { data, error } = await supa
+    .from(PROFILES_TABLE)
+    .update({ exibir_anuncios: !!enabled, updated_at: ts })
+    .eq("id", id)
+    .select("*")
+    .maybeSingle()
+  if (error) throw error
+  return { ok: true, profile: data as Profile }
+}
+
+export async function deleteProfile(id: string) {
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const res = await nocodbFetch(`/api/v2/tables/${table}/records/${id}`, {
+      method: "DELETE",
+    })
+    // NocoDB retorna vazio/ok; consideramos sucesso
+    return true
+  }
+
   const supa = db()
   const { error } = await supa.from(PROFILES_TABLE).delete().eq("id", id)
   if (error) throw error
   return true
+}
+
+// ==============================
+// Métricas do Admin
+// ==============================
+export type AdminMetrics = {
+  totalProfiles: number
+  publishedProfiles: number
+  profilesWithAds: number
+  profilesWithoutAds: number
+}
+
+export async function getAdminMetrics(): Promise<AdminMetrics> {
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    // total
+    const totalJson = await nocodbFetch(`/api/v2/tables/${table}/records?limit=1`)
+    const total = Number(totalJson?.pageInfo?.totalRows || 0)
+
+    // published
+    const wPub = encodeURIComponent(`(status,eq,published)`)
+    const pubJson = await nocodbFetch(`/api/v2/tables/${table}/records?where=${wPub}&limit=1`)
+    const published = Number(pubJson?.pageInfo?.totalRows || 0)
+
+    // withAds
+    const wAds = encodeURIComponent(`(exibir_anuncios,eq,true)`)
+    const adsJson = await nocodbFetch(`/api/v2/tables/${table}/records?where=${wAds}&limit=1`)
+    const withAds = Number(adsJson?.pageInfo?.totalRows || 0)
+
+    return {
+      totalProfiles: total,
+      publishedProfiles: published,
+      profilesWithAds: withAds,
+      profilesWithoutAds: Math.max(0, total - withAds),
+    }
+  }
+
+  const supa = db()
+  const [{ count: total = 0, error: e1 }, { count: published = 0, error: e2 }, { count: withAds = 0, error: e3 }] =
+    await Promise.all([
+      supa.from(PROFILES_TABLE).select("*", { count: "exact", head: true }),
+      supa.from(PROFILES_TABLE).select("*", { count: "exact", head: true }).eq("status", "published"),
+      supa.from(PROFILES_TABLE).select("*", { count: "exact", head: true }).eq("exibir_anuncios", true),
+    ])
+  if (e1) throw e1
+  if (e2) throw e2
+  if (e3) throw e3
+
+  return {
+    totalProfiles: total || 0,
+    publishedProfiles: published || 0,
+    profilesWithAds: withAds || 0,
+    profilesWithoutAds: (total || 0) - (withAds || 0),
+  }
+}
+
+export async function getDashboardStats(): Promise<{ cards: Array<{ label: string; value: number }> }> {
+  const m = await getAdminMetrics()
+  return {
+    cards: [
+      { label: "Perfis", value: m.totalProfiles },
+      { label: "Publicados", value: m.publishedProfiles },
+      { label: "Com Anúncios", value: m.profilesWithAds },
+    ],
+  }
+}
+
+// ==============================
+// Auxiliar (NocoDB/Supa)
+// ==============================
+export async function getProfileById(id: string): Promise<Profile | null> {
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const json = await nocodbFetch(`/api/v2/tables/${table}/records/${id}`)
+    const row = (json?.list?.[0] || json) as AnyObj
+    return row && row.id ? mapRowToProfile(row) : null
+  }
+
+  const supa = db()
+  const { data, error } = await supa
+    .from(PROFILES_TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle()
+  if (error) throw error
+  return (data as Profile) ?? null
 }
