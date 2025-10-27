@@ -4,9 +4,13 @@ import BackdropLines from '@/components/BackdropLines'
 import NeonHero from '@/components/NeonHero'
 import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
+import AdSlot from '@/components/AdSlot' // ✅ novo
 
 export default async function Page() {
   const { data: featured } = await listFeatured(12)
+
+  // pega default do env se quiser
+  const AD_UNIT_DEFAULT = process.env.NEXT_PUBLIC_GAM_CONTENT1 || ''
 
   return (
     <div className="relative bg-[#050010] text-white">
@@ -49,12 +53,25 @@ export default async function Page() {
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
                 Publicidade
               </div>
-              <div
-                id="Content1"
-                className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-              >
-                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-              </div>
+
+              {/* ✅ Usa AdSlot se houver ad unit; senão, fallback visual */}
+              {AD_UNIT_DEFAULT ? (
+                <AdSlot
+                  id="Content1"
+                  label="Content1"
+                  size="fluid"             // aceita responsivo
+                  variant="rectangle"
+                  adUnitPath={AD_UNIT_DEFAULT} // ou slot=...
+                />
+              ) : (
+                <div
+                  id="Content1"
+                  className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+                >
+                  <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                  <span className="text-xs text-white/60">Defina NEXT_PUBLIC_GAM_CONTENT1 no .env</span>
+                </div>
+              )}
             </div>
           </div>
 
