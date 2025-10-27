@@ -1,26 +1,28 @@
+// components/ProfileQuizBlock.tsx
 'use client'
-import { useState } from 'react'
 
-export default function QuizWidget({ quiz }:{ quiz?:{title:string;questions:{q:string;options:string[];correctIndex:number}[]} }) {
-  const [answers, setAnswers] = useState<number[]>([])
-  if (!quiz) return null
+import QuizWidget from './QuizWidget'
+
+type Q = {
+  q: string
+  options?: string[]        // agora opcional
+  correctIndex?: number     // agora opcional
+}
+
+type Props = {
+  title: string
+  description?: string
+  questions: Q[]
+}
+
+export default function ProfileQuizBlock({ title, description, questions }: Props) {
+  if (!questions?.length) return null
+
   return (
-    <section className="mt-6 p-4 rounded-2xl border">
-      <h3 className="font-semibold text-xl mb-2">{quiz.title}</h3>
-      {quiz.questions.map((it, idx)=>(
-        <div key={idx} className="mb-4">
-          <p className="font-medium">{it.q}</p>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {it.options.map((op, oi)=>(
-              <button key={oi}
-                onClick={()=>setAnswers(a=>{ const b=[...a]; b[idx]=oi; return b; })}
-                className={`px-3 py-2 rounded-xl border ${answers[idx]===oi ? 'bg-black text-white' : 'bg-white'}`}>
-                {op}
-              </button>
-            ))}
-          </div>
-        </div>
-      ))}
+    <section className="card px-6 md:px-8 py-7 md:py-9" id="quiz">
+      <h2 className="h-section mb-1">{title}</h2>
+      {description && <p className="text-white/70 mb-3">{description}</p>}
+      <QuizWidget quiz={{ title, questions }} />
     </section>
   )
 }
