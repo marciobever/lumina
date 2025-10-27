@@ -178,8 +178,11 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
     min: 8,
   })
 
+  // ✅ normaliza o fallback para casar com o tipo esperado
   const articleNorm = normalizeArticle((p as any).article)
-  const article = articleNorm && articleNorm.content?.length ? articleNorm : buildFallbackArticle(p)
+  const article = articleNorm && articleNorm.content?.length
+    ? articleNorm
+    : normalizeArticle(buildFallbackArticle(p))
 
   const slug = (p as any).slug
   const showAds = !!(p as any).exibir_anuncios
@@ -279,7 +282,8 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
               {/* SOBRE */}
               <section className="card px-6 md:px-8 py-7 md:py-9" id="sobre">
                 <h2 className="text-2xl font-semibold text-white/95 mb-6">Sobre</h2>
-                <ProfileAbout text={(p as any).bio || (p as any).short_bio} tags={Array.isArray((p as any).tags) ? (p as any).tags.filter(Boolean) : []} />
+                {/* ✅ ProfileAbout agora só recebe `text` (sem `tags`) */}
+                <ProfileAbout text={(p as any).bio || (p as any).short_bio} />
               </section>
 
               {/* EDITORIAL */}
