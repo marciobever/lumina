@@ -1,3 +1,6 @@
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic' // força SSR; não tenta SSG no build
+
 import { NextResponse } from 'next/server'
 import { getDashboardStats } from '@/lib/queries'
 
