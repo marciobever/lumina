@@ -1,4 +1,7 @@
 // app/page.tsx
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import { listFeatured } from '@/lib/queries'
 import BackdropLines from '@/components/BackdropLines'
 import NeonHero from '@/components/NeonHero'
@@ -6,7 +9,14 @@ import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
 
 export default async function Page() {
-  const { data: featured } = await listFeatured(12)
+  // Evita quebrar em build/pré-render e em runtime sem envs:
+  let featured: any[] = []
+  try {
+    const { data } = await listFeatured(12)
+    featured = Array.isArray(data) ? data : []
+  } catch {
+    featured = []
+  }
 
   return (
     <div className="relative bg-[#050010] text-white">
@@ -82,12 +92,12 @@ export default async function Page() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {(featured ?? []).map((p: any) => (
+            {featured.map((p: any) => (
               <div key={p.slug} className="aspect-[3/4]">
                 <ProfileCard
                   p={{
                     ...p,
-                    nome: p.display_name,
+                    nome: p.display_name ?? p.name,
                     titulo: p.title,
                     categoria: p.sector,
                     capa_url: p.cover_url,
