@@ -58,7 +58,7 @@ export default async function PerfisPage({ searchParams }: Props) {
 
   const { data, total, perPage } = await listProfiles({
     page,
-    perPage: REQUEST_SIZE,
+    perPage: REQUEST_SIZE, // <- aqui é perPage (não pageSize)
     q,
     sector,
     status,
@@ -82,13 +82,11 @@ export default async function PerfisPage({ searchParams }: Props) {
 
   return (
     <div className="relative">
-      {/* Topo: “Leaderboard” visual usando Content2 (retângulo responsivo) */}
+      {/* Leaderboard topo (Content2) */}
       <div className="container pt-6">
         <div className="w-full flex justify-center">
-          <div className="w-full max-w-[970px] flex flex-col items-center">
-            <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
-              Publicidade
-            </div>
+          <div className="w-full max-w-[980px] flex flex-col items-center">
+            <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
             <div
               id="Content2"
               className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
@@ -113,7 +111,7 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* Grade + Sidebar */}
+      {/* Grade + Skyscraper (Desktop) */}
       <section className="pb-10">
         <div className="container">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
@@ -124,18 +122,20 @@ export default async function PerfisPage({ searchParams }: Props) {
                   {grid.map((item, i) => (
                     <div key={i} className="card-aspect">
                       {item.kind === 'ad' ? (
-                        // Card de publicidade dentro da grade (Content3)
-                        <div className="w-full h-full rounded-xl border border-white/10 bg-white/5 p-3 flex items-center justify-center">
-                          <div className="w-full">
-                            <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
-                              Publicidade
-                            </div>
-                            <div
-                              id="Content3"
-                              className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
-                            >
-                              <span className="text-xs text-white/60">Carregando anúncio…</span>
-                              <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                        // Card nativo no meio da grade (Content3)
+                        <div className="w-full h-full">
+                          <div className="h-full rounded-xl border border-white/10 bg-white/5 p-4 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.06)]">
+                            <div className="w-full">
+                              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-2">
+                                Publicidade
+                              </div>
+                              <div
+                                id="Content3"
+                                className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center"
+                              >
+                                <span className="text-xs text-white/60">Carregando anúncio…</span>
+                                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -155,21 +155,16 @@ export default async function PerfisPage({ searchParams }: Props) {
               </div>
             </div>
 
-            {/* Lateral (só em lg+) */}
+            {/* Lateral (só em lg+) — Skyscraper (Content4) */}
             <aside className="hidden lg:block">
               <div className="sticky top-24">
-                {/* Retângulo lateral (Content4) */}
-                <div className="w-[300px] mx-auto">
-                  <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
-                    Publicidade
-                  </div>
-                  <div
-                    id="Content4"
-                    className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
-                  >
-                    <span className="text-xs text-white/60">Carregando anúncio…</span>
-                    <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                  </div>
+                <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
+                <div
+                  id="Content4"
+                  className="w-[300px] min-h-[600px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+                >
+                  <span className="text-xs text-white/60">Carregando anúncio…</span>
+                  <noscript>Ative o JavaScript para ver o anúncio.</noscript>
                 </div>
               </div>
             </aside>
