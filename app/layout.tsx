@@ -29,80 +29,146 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="gpt-bootstrap" strategy="afterInteractive">
           {`
 (function(){
-  window.googletag = window.googletag || {cmd: []};
+  // Estado global para evitar repetições
+  window.__luminaGpt = window.__luminaGpt || { inited:false, slots:{}, displayed:{} };
 
-  googletag.cmd.push(function () {
-    // ---- Targeting UTM ----
-    try {
-      var q = new URLSearchParams(window.location.search || "");
-      var utm_source   = q.get("utm_source");
-      var utm_medium   = q.get("utm_medium");
-      var utm_campaign = q.get("utm_campaign");
-      if (utm_source)   googletag.pubads().setTargeting('utm_source',   [utm_source]);
-      if (utm_medium)   googletag.pubads().setTargeting('utm_medium',   [utm_medium]);
-      if (utm_campaign) googletag.pubads().setTargeting('utm_campaign', [utm_campaign]);
-    } catch (e) {}
+  window.googletag = window.googletag || { cmd: [] };
 
-    // ---- Size Mapping comum (retângulos / fluid) ----
-    var rectMapping = googletag.sizeMapping()
-      .addSize([0,0], ['fluid', [250,250], [300,250], [336,280]])
-      .build();
+  function setup() {
+    if (window.__luminaGpt.inited) return;
+    window.__luminaGpt.inited = true;
 
-    // ---- Interstitial ----
-    try {
-      var slotInt = googletag.defineOutOfPageSlot(
-        '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Interstitial',
-        googletag.enums.OutOfPageFormat.INTERSTITIAL
-      );
-      if (slotInt) slotInt.addService(googletag.pubads());
-    } catch (e) {}
+    googletag.cmd.push(function () {
+      // ---- Targeting UTM ----
+      try {
+        var q = new URLSearchParams(window.location.search || "");
+        var utm_source   = q.get("utm_source");
+        var utm_medium   = q.get("utm_medium");
+        var utm_campaign = q.get("utm_campaign");
+        if (utm_source)   googletag.pubads().setTargeting('utm_source',   [utm_source]);
+        if (utm_medium)   googletag.pubads().setTargeting('utm_medium',   [utm_medium]);
+        if (utm_campaign) googletag.pubads().setTargeting('utm_campaign', [utm_campaign]);
+      } catch (e) {}
 
-    // ---- Anchor (TOP) ----
-    try {
-      var slotAnchor = googletag.defineOutOfPageSlot(
-        '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Anchor',
-        googletag.enums.OutOfPageFormat.TOP_ANCHOR
-      );
-      if (slotAnchor) slotAnchor.addService(googletag.pubads());
-    } catch (e) {}
+      // ---- Size Mapping comum (retângulos / fluid) ----
+      var rectMapping = googletag.sizeMapping()
+        .addSize([0,0], ['fluid', [250,250], [300,250], [336,280]])
+        .build();
 
-    // ---- Lazy load global ----
-    try {
-      googletag.pubads().enableLazyLoad({
-        fetchMarginPercent: 20,
-        renderMarginPercent: 10,
-        mobileScaling: 2.0
-      });
-    } catch (e) {}
+      // Guarda mapping para reuso
+      window.__luminaGpt.rectMapping = rectMapping;
 
-    // ---- Content1..Content9: cria só se o elemento existir ----
-    var ids = ['Content1','Content2','Content3','Content4','Content5','Content6','Content7','Content8','Content9'];
-    ids.forEach(function(id){
-      var el = document.getElementById(id);
-      if (!el) return;
+      // ---- Interstitial ----
+      try {
+        var slotInt = googletag.defineOutOfPageSlot(
+          '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Interstitial',
+          googletag.enums.OutOfPageFormat.INTERSTITIAL
+        );
+        if (slotInt) {
+          slotInt.addService(googletag.pubads());
+          window.__luminaGpt.slotInt = slotInt;
+        }
+      } catch (e) {}
 
-      // Caminho fixo (igual WP)
-      var path = '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_' + id;
+      // ---- Anchor (TOP) ----
+      try {
+        var slotAnchor = googletag.defineOutOfPageSlot(
+          '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Anchor',
+          googletag.enums.OutOfPageFormat.TOP_ANCHOR
+        );
+        if (slotAnchor) {
+          slotAnchor.addService(googletag.pubads());
+          window.__luminaGpt.slotAnchor = slotAnchor;
+        }
+      } catch (e) {}
 
-      var slot = googletag.defineSlot(path, [[250,250],[300,250],[336,280]], id);
-      if (!slot) return;
+      // ---- Lazy load global + collapse ----
+      try {
+        googletag.pubads().enableLazyLoad({
+          fetchMarginPercent: 20,
+          renderMarginPercent: 10,
+          mobileScaling: 2.0
+        });
+        googletag.pubads().collapseEmptyDivs(true);
+      } catch (e) {}
 
-      slot.defineSizeMapping(rectMapping)
-          .setCollapseEmptyDiv(true)
-          .addService(googletag.pubads());
+      // ---- Ativa serviços uma vez ----
+      googletag.enableServices();
+
+      // ---- Exibir out-of-page uma vez ----
+      try { if (window.__luminaGpt.slotInt) googletag.display(window.__luminaGpt.slotInt); } catch(e){}
+      try { if (window.__luminaGpt.slotAnchor) googletag.display(window.__luminaGpt.slotAnchor); } catch(e){}
     });
+  }
 
-    // ---- Ativa serviços uma vez ----
-    googletag.enableServices();
+  // Cria/mostra um slot ContentX quando o div aparece
+  function ensureSlot(id) {
+    if (!id) return;
+    var el = document.getElementById(id);
+    if (!el) return;
 
-    // ---- Display: interstitial/anchor + blocos presentes ----
-    try { if (typeof slotInt !== 'undefined' && slotInt) googletag.display(slotInt); } catch(e){}
-    try { if (typeof slotAnchor !== 'undefined' && slotAnchor) googletag.display(slotAnchor); } catch(e){}
+    googletag.cmd.push(function () {
+      // Se já temos o slot definido, só exibe (uma vez)
+      if (!window.__luminaGpt.slots[id]) {
+        var path = '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_' + id;
 
-    ids.forEach(function(id){
-      if (document.getElementById(id)) googletag.display(id);
+        var slot = googletag.defineSlot(
+          path,
+          [[250,250],[300,250],[336,280]],
+          id
+        );
+
+        if (slot) {
+          slot.defineSizeMapping(window.__luminaGpt.rectMapping)
+              .setCollapseEmptyDiv(true)
+              .addService(googletag.pubads());
+          window.__luminaGpt.slots[id] = slot;
+        }
+      }
+
+      // Display apenas uma vez por div
+      if (!window.__luminaGpt.displayed[id]) {
+        window.__luminaGpt.displayed[id] = true;
+        googletag.display(id);
+      }
     });
+  }
+
+  // IDs suportados (iguais ao WP)
+  var ids = ['Content1','Content2','Content3','Content4','Content5','Content6','Content7','Content8','Content9'];
+
+  // Setup inicial
+  setup();
+
+  // Primeira varredura (caso alguns divs já existam na primeira renderização)
+  function initialScan() {
+    ids.forEach(function(id){ ensureSlot(id); });
+  }
+  initialScan();
+
+  // Observa o DOM e, quando aparecer qualquer ContentX, define/exibe o slot
+  var mo = new MutationObserver(function(mutations){
+    for (var m of mutations) {
+      if (!m.addedNodes) continue;
+      for (var n of m.addedNodes) {
+        if (!(n instanceof HTMLElement)) continue;
+        // Se o nó adicionado for o próprio slot
+        if (ids.includes(n.id)) {
+          ensureSlot(n.id);
+        }
+        // Ou se contiver slots dentro
+        ids.forEach(function(id){
+          var found = n.querySelector && n.querySelector('#' + id);
+          if (found) ensureSlot(id);
+        });
+      }
+    }
   });
+
+  try {
+    mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
+  } catch(e) {}
+
 })();
           `}
         </Script>
