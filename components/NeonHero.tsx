@@ -1,5 +1,4 @@
 // components/NeonHero.tsx
-import Link from 'next/link'
 import clsx from 'clsx'
 
 type Props = {
@@ -53,32 +52,33 @@ export default function NeonHero({ fullscreen = false, scrollHintHref }: Props) 
 
         {/* --- CTA multiline --- */}
         <div className="cta-wrap">
-          <Link href="/perfis" className="cta-primary mt-6">
+          {/* Usei <a> para evitar typedRoutes até as páginas existirem */}
+          <a href="/perfis" className="cta-primary mt-6">
             🌟 Explorar catálogo completo
-          </Link>
+          </a>
 
           <div className="cta-row mt-2">
-            <Link href="/perfis?tag=novas" className="cta-pill">
+            <a href="/perfis?tag=novas" className="cta-pill">
               <div className="k">em destaque</div>
               <div className="t">Novas perfis da semana</div>
-            </Link>
+            </a>
 
-            <Link href="/quiz" className="cta-pill">
+            <a href="#quiz" className="cta-pill">
               <div className="k">diversão</div>
               <div className="t">Faça o quiz “Qual estilo é o seu?”</div>
-            </Link>
+            </a>
           </div>
 
           <div className="cta-row mt-2">
-            <Link href="/editorial" className="cta-pill">
+            <a href="/editorial" className="cta-pill">
               <div className="k">curadoria</div>
               <div className="t">Histórias e bastidores</div>
-            </Link>
+            </a>
 
-            <Link href="/beneficios" className="cta-pill">
+            <a href="/beneficios" className="cta-pill">
               <div className="k">parcerias</div>
               <div className="t">Descubra benefícios exclusivos</div>
-            </Link>
+            </a>
           </div>
         </div>
       </div>
