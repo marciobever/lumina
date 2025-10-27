@@ -62,6 +62,7 @@ const buildPrettyUniqueTags = (arr?: (string | null)[]) => {
   return Array.from(map.values())
 }
 
+/* ---------- componente principal ---------- */
 export default function ProfileHeader({
   slug,
   display_name,
@@ -76,7 +77,13 @@ export default function ProfileHeader({
   assistantUrl,
 }: Props) {
   const label = normalizeSector(sector ?? undefined, sectorLabelProp ?? undefined)
-  const tagList = useMemo(() => buildPrettyUniqueTags(tags).slice(0, 8), [tags])
+
+  // ✅ Corrigido: normaliza tags null/undefined antes de enviar ao helper
+  const tagInput = useMemo<(string | null)[] | undefined>(() => (
+    Array.isArray(tags) ? tags : undefined
+  ), [tags])
+
+  const tagList = useMemo(() => buildPrettyUniqueTags(tagInput).slice(0, 8), [tagInput])
 
   // --- imagem de fundo (cover) ---
   const cover = hero_url || avatar_url || ''
