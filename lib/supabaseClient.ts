@@ -1,9 +1,12 @@
 // lib/supabaseClient.ts
-import { createClient } from '@supabase/supabase-js'
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
-let _public: ReturnType<typeof createClient> | null = null
+// Tipagem ampla para permitir qualquer schema (ex.: 'lumina')
+type AnyClient = SupabaseClient<any, any, any>
 
-export function sb(): ReturnType<typeof createClient> {
+let _public: AnyClient | null = null
+
+export function sb(): AnyClient {
   if (_public) return _public
 
   const url  = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -14,13 +17,14 @@ export function sb(): ReturnType<typeof createClient> {
     )
   }
 
-  // 🔧 Sem db.schema aqui para evitar conflito de tipos no build
+  // Sem db.schema aqui para evitar conflito de tipos.
   _public = createClient(url, anon, {
     auth: { persistSession: true },
-  })
+  }) as AnyClient
 
   return _public
 }
 
-/** Use sempre este helper nas consultas do client/SSR (schema 'lumina') */
-export const fromL = (table: string) => sb().schema('lumina').from(table)
+/** Helper: sempre consulta no schema 'lumina' */
+export const fromL = (table: string) =>
+  sb().schema('lumina').from(table)
