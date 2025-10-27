@@ -47,7 +47,9 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   return <div className={`rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 ${className}`}>{children}</div>
 }
 
-function Stat({ label, value }: { label: string | number }) {
+// ✅ corrigido: tipagem inclui "value"
+type StatProps = { label: string | number; value: string | number }
+function Stat({ label, value }: StatProps) {
   return (
     <div className="flex flex-col">
       <span className="text-sm text-white/70">{label}</span>
@@ -56,11 +58,13 @@ function Stat({ label, value }: { label: string | number }) {
   )
 }
 
-/** Converte status do banco (pt) em JobStatus do painel */
+/** Converte status do banco (pt/en) em JobStatus do painel */
 function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
   switch ((dbStatus || '').toLowerCase()) {
+    case 'published':
     case 'publicado':
       return 'completed'
+    case 'draft':
     case 'rascunho':
       return 'queued'
     default:
@@ -69,12 +73,12 @@ function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
 }
 
 async function fetchRealServer(): Promise<DashboardData> {
-  const supa = db() // já configurado p/ schema 'lumina' no seu supabaseServer
+  const supa = db() // já aponta para o schema 'lumina'
 
-  // ⚠️ No banco é 'publicado' e 'rascunho'
+  // ✅ alinhado com o projeto: 'published' e 'draft'
   const [{ count: cPub }, { count: cDraft }] = await Promise.all([
-    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'publicado'),
-    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'rascunho'),
+    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'published'),
+    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
   ])
 
   const { data: perfis, error } = await supa
@@ -99,8 +103,13 @@ async function fetchRealServer(): Promise<DashboardData> {
   const webhooks: WebhookInfo[] = []
   const whGen = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL || process.env.N8N_LUMINA_CREATE
   if (whGen) webhooks.push({ id: 'wh1', name: 'n8n-generate', url: whGen, enabled: true })
-  if (process.env.N8N_WEBSTORIES_URL) {
-    webhooks.push({ id: 'wh2', name: 'n8n-webstories', url: process.env.N8N_WEBSTORIES_URL, enabled: true })
+  if (process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL) {
+    webhooks.push({
+      id: 'wh2',
+      name: 'n8n-webstories',
+      url: (process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL)!,
+      enabled: true
+    })
   }
 
   return {
@@ -187,7 +196,9 @@ export default async function AdminDashboard() {
                     <td className="py-3 pr-4 font-medium">{j.nome}</td>
                     <td className="py-3 pr-4 text-white/80">{j.nicho}</td>
                     <td className="py-3 pr-4"><StatusPill s={j.status} /></td>
-                    <td className="py-3 pr-4 text-white/60">{new Date(j.updated_at).toLocaleString()}</td>
+                    <td className="py-3 pr-4 text-white/60">
+                      {new Date(j.updated_at).toLocaleString('pt-BR')}
+                    </td>
                     <td className="py-3">
                       <div className="flex gap-2">
                         <button className="btn border-white/10 hover:bg-white/10">Ver</button>
