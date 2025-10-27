@@ -154,7 +154,7 @@ export async function getProfileBySlug(slug: string): Promise<Profile | null> {
   return (data as Profile) ?? null
 }
 
-export async function getProfilePhotos(profileId: string): Promise( Photo[] ) {
+export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
   if (nocodbEnabled()) {
     const tablePhotos = nocodbTablePhotos()
     // Se não houver tabela de fotos, caímos para campos do perfil
