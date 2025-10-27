@@ -33,7 +33,6 @@ function mapToCardProps(p: any) {
     nome: p?.display_name ?? p?.name ?? p?.slug ?? '—',
     titulo: p?.title ?? '',
     categoria: p?.sector ?? '',
-    // ordem de preferência para a capa
     capa_url:
       (typeof p?.hero_url === 'string' && p.hero_url) ||
       (typeof p?.cover_url === 'string' && p.cover_url) ||
@@ -48,9 +47,8 @@ export default async function PerfisPage({ searchParams }: Props) {
 
   // Regra: 11 perfis + 1 ad = 12 itens na grade
   const PER_PAGE_WITHOUT_AD = 11
-  const REQUEST_SIZE = PER_PAGE_WITHOUT_AD + 1 // pedimos 12 p/ olhar próxima página
+  const REQUEST_SIZE = PER_PAGE_WITHOUT_AD + 1
 
-  // filtros opcionais vindos da URL
   const q = searchParams?.q?.trim() || undefined
   const sector = searchParams?.sector?.trim() || undefined
   const status = (searchParams?.status as 'draft' | 'published' | undefined) || 'published'
@@ -58,17 +56,14 @@ export default async function PerfisPage({ searchParams }: Props) {
 
   const { data, total, perPage } = await listProfiles({
     page,
-    perPage: REQUEST_SIZE, // <- aqui é perPage (não pageSize)
+    perPage: REQUEST_SIZE,
     q,
     sector,
     status,
     adsOnly,
   })
 
-  // Só 11 perfis na grade; o 12º é lookahead
   const profiles = Array.isArray(data) ? data.slice(0, PER_PAGE_WITHOUT_AD) : []
-
-  // Insere 1 ad DEPOIS do 6º card (se houver)
   const insertAfterIndex = Math.min(6, Math.max(0, profiles.length))
   const grid: Array<{ kind: 'profile'; p: any } | { kind: 'ad' }> = []
 
@@ -76,20 +71,19 @@ export default async function PerfisPage({ searchParams }: Props) {
   if (profiles.length > 0) grid.push({ kind: 'ad' as const })
   for (let i = insertAfterIndex; i < profiles.length; i++) grid.push({ kind: 'profile', p: profiles[i] })
 
-  // Paginação correta
   const perPageReal = perPage ?? REQUEST_SIZE
   const hasNext = total > page * perPageReal
 
   return (
     <div className="relative">
-      {/* Leaderboard topo (Content2) */}
+      {/* ====== TOPO: bloco centralizado (Content2) ====== */}
       <div className="container pt-6">
         <div className="w-full flex justify-center">
-          <div className="w-full max-w-[980px] flex flex-col items-center">
+          <div className="w-full max-w-[336px] flex flex-col items-center">
             <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
             <div
               id="Content2"
-              className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+              className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
             >
               <span className="text-xs text-white/60">Carregando anúncio…</span>
               <noscript>Ative o JavaScript para ver o anúncio.</noscript>
@@ -98,7 +92,7 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </div>
 
-      {/* Título + filtros */}
+      {/* ====== Título + filtros ====== */}
       <section className="section">
         <div className="container">
           <div className="mb-5 md:mb-6">
@@ -111,7 +105,7 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* Grade + Skyscraper (Desktop) */}
+      {/* ====== Grade + Lateral ====== */}
       <section className="pb-10">
         <div className="container">
           <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
@@ -123,20 +117,16 @@ export default async function PerfisPage({ searchParams }: Props) {
                     <div key={i} className="card-aspect">
                       {item.kind === 'ad' ? (
                         // Card nativo no meio da grade (Content3)
-                        <div className="w-full h-full">
-                          <div className="h-full rounded-xl border border-white/10 bg-white/5 p-4 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.06)]">
-                            <div className="w-full">
-                              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-2">
-                                Publicidade
-                              </div>
-                              <div
-                                id="Content3"
-                                className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center"
-                              >
-                                <span className="text-xs text-white/60">Carregando anúncio…</span>
-                                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                              </div>
-                            </div>
+                        <div className="h-full w-full">
+                          <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
+                            Publicidade
+                          </div>
+                          <div
+                            id="Content3"
+                            className="h-full w-full rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+                          >
+                            <span className="text-xs text-white/60">Carregando anúncio…</span>
+                            <noscript>Ative o JavaScript para ver o anúncio.</noscript>
                           </div>
                         </div>
                       ) : (
@@ -146,7 +136,27 @@ export default async function PerfisPage({ searchParams }: Props) {
                   ))}
                 </div>
               ) : (
-                <div className="card p-8 text-white/70">Nenhum perfil encontrado para os filtros aplicados.</div>
+                <>
+                  <div className="card p-8 text-white/70">
+                    Nenhum perfil encontrado para os filtros aplicados.
+                  </div>
+
+                  {/* Mesmo sem resultados, mostra um bloco de anúncio abaixo (Content4) */}
+                  <div className="mt-6 w-full flex justify-center">
+                    <div className="w-full max-w-[336px]">
+                      <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
+                        Publicidade
+                      </div>
+                      <div
+                        id="Content4"
+                        className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+                      >
+                        <span className="text-xs text-white/60">Carregando anúncio…</span>
+                        <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                      </div>
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* Paginação */}
@@ -155,13 +165,15 @@ export default async function PerfisPage({ searchParams }: Props) {
               </div>
             </div>
 
-            {/* Lateral (só em lg+) — Skyscraper (Content4) */}
+            {/* Lateral (lg+) — Content5 */}
             <aside className="hidden lg:block">
               <div className="sticky top-24">
-                <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
+                <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
+                  Publicidade
+                </div>
                 <div
-                  id="Content4"
-                  className="w-[300px] min-h-[600px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+                  id="Content5"
+                  className="w-[300px] min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
                 >
                   <span className="text-xs text-white/60">Carregando anúncio…</span>
                   <noscript>Ative o JavaScript para ver o anúncio.</noscript>
