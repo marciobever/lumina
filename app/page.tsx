@@ -4,13 +4,9 @@ import BackdropLines from '@/components/BackdropLines'
 import NeonHero from '@/components/NeonHero'
 import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
-import AdSlot from '@/components/AdSlot' // <— import do componente
 
 export default async function Page() {
   const { data: featured } = await listFeatured(12)
-
-  // opcional: define via .env.local
-  const AD_UNIT_DEFAULT = process.env.NEXT_PUBLIC_GAM_CONTENT1 || ''
 
   return (
     <div className="relative bg-[#050010] text-white">
@@ -47,30 +43,18 @@ export default async function Page() {
             </button>
           </form>
 
-          {/* SLOT DE PUBLICIDADE */}
+          {/* SLOT DE PUBLICIDADE (placeholder estilo WordPress/GAM) */}
           <div className="w-full flex justify-center mt-8">
             <div className="w-full max-w-[336px] flex flex-col items-center">
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
                 Publicidade
               </div>
-
-              {AD_UNIT_DEFAULT ? (
-                <AdSlot
-                  id="Content1"
-                  label="Content1"
-                  size="fluid"
-                  variant="native-card"           // ✅ corrigido: era "rectangle"
-                  adUnitPath={AD_UNIT_DEFAULT}
-                />
-              ) : (
-                <div
-                  id="Content1"
-                  className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-                >
-                  <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                  <span className="text-xs text-white/60">Defina NEXT_PUBLIC_GAM_CONTENT1 no .env</span>
-                </div>
-              )}
+              <div
+                id="Content1"
+                className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+              >
+                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+              </div>
             </div>
           </div>
 
