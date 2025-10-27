@@ -4,12 +4,12 @@ import BackdropLines from '@/components/BackdropLines'
 import NeonHero from '@/components/NeonHero'
 import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
-import AdSlot from '@/components/AdSlot' // ✅ novo
+import AdSlot from '@/components/AdSlot' // <— import do componente
 
 export default async function Page() {
   const { data: featured } = await listFeatured(12)
 
-  // pega default do env se quiser
+  // opcional: define via .env.local
   const AD_UNIT_DEFAULT = process.env.NEXT_PUBLIC_GAM_CONTENT1 || ''
 
   return (
@@ -54,14 +54,13 @@ export default async function Page() {
                 Publicidade
               </div>
 
-              {/* ✅ Usa AdSlot se houver ad unit; senão, fallback visual */}
               {AD_UNIT_DEFAULT ? (
                 <AdSlot
                   id="Content1"
                   label="Content1"
-                  size="fluid"             // aceita responsivo
-                  variant="rectangle"
-                  adUnitPath={AD_UNIT_DEFAULT} // ou slot=...
+                  size="fluid"
+                  variant="native-card"           // ✅ corrigido: era "rectangle"
+                  adUnitPath={AD_UNIT_DEFAULT}
                 />
               ) : (
                 <div
