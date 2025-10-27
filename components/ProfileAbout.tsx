@@ -3,7 +3,11 @@
 
 import { useMemo, useState } from 'react'
 
-type Props = { text?: string | null; maxChars?: number }
+type Props = {
+  text?: string | null
+  maxChars?: number
+  tags?: string[]
+}
 
 function normalizeText(raw?: string | null) {
   if (!raw) return ''
@@ -11,7 +15,7 @@ function normalizeText(raw?: string | null) {
   return raw.replace(/\\n/g, '\n').replace(/\r\n/g, '\n').trim()
 }
 
-export default function ProfileAbout({ text, maxChars = 650 }: Props) {
+export default function ProfileAbout({ text, maxChars = 650, tags = [] }: Props) {
   const [expanded, setExpanded] = useState(false)
   const clean = useMemo(() => normalizeText(text), [text])
 
@@ -74,6 +78,18 @@ export default function ProfileAbout({ text, maxChars = 650 }: Props) {
         <p className="text-white/75">
           Perfil editorial focado em nichos fortes de negócio e conteúdo orientado a performance.
         </p>
+        {tags.length > 0 && (
+          <ul className="mt-4 flex flex-wrap gap-2">
+            {tags.filter(Boolean).slice(0, 12).map((t) => (
+              <li
+                key={t}
+                className="px-2.5 py-1 rounded-full text-xs font-medium border border-white/10 bg-white/5 text-white/75"
+              >
+                #{t}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     )
   }
@@ -93,6 +109,19 @@ export default function ProfileAbout({ text, maxChars = 650 }: Props) {
             {expanded ? 'Mostrar menos' : 'Mostrar mais'}
           </button>
         </div>
+      )}
+
+      {tags.length > 0 && (
+        <ul className="mt-5 flex flex-wrap gap-2">
+          {tags.filter(Boolean).slice(0, 12).map((t) => (
+            <li
+              key={t}
+              className="px-2.5 py-1 rounded-full text-xs font-medium border border-white/10 bg-white/5 text-white/75"
+            >
+              #{t}
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )
