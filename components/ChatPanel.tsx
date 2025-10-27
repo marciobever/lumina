@@ -14,7 +14,7 @@ type Props = {
 
 export default function ChatPanel({ context, suggestions = [] }: Props) {
   const [messages, setMessages] = useState<ChatMsg[]>([
-    { role: 'assistant', content: 'Oi! Como posso te ajudar hoje?' }
+    { role: 'assistant' as const, content: 'Oi! Como posso te ajudar hoje?' }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -56,22 +56,23 @@ export default function ChatPanel({ context, suggestions = [] }: Props) {
   }, [messages, loading])
 
   const send = async (text: string) => {
-    if (!text.trim() || loading) return
+    const trimmed = text.trim()
+    if (!trimmed || loading) return
 
-    const next = [...messages, { role: 'user', content: text.trim() }]
+    const next: ChatMsg[] = [...messages, { role: 'user' as const, content: trimmed }]
     setMessages(next)
     setInput('')
     setLoading(true)
 
     try {
       // Limpa histórico (remove vazias e limita tamanho)
-      const cleanHistory = next
-        .filter(m => m && typeof m.content === 'string' && m.content.trim())
-        .slice(-20)
+      const cleanHistory: ChatMsg[] = next
+        .filter(m => m && typeof m.content === 'string' && m.content.trim()) as ChatMsg[]
+      const sliced = cleanHistory.slice(-20)
 
       if (!effectiveContext.slug) {
         setMessages(prev => [...prev, {
-          role: 'assistant',
+          role: 'assistant' as const,
           content: 'Não consegui identificar o perfil. Abra o assistente pelo botão do próprio perfil para carregar o contexto.'
         }])
         return
@@ -80,9 +81,8 @@ export default function ChatPanel({ context, suggestions = [] }: Props) {
       const res = await fetch('/api/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // 🔑 Pacote enviado: messages + context (com slug garantido) + system_prompt
         body: JSON.stringify({
-          messages: cleanHistory,
+          messages: sliced,
           context: effectiveContext,
           system_prompt
         })
@@ -92,6 +92,7 @@ export default function ChatPanel({ context, suggestions = [] }: Props) {
       // Streaming simples (fallback para texto inteiro)
       const reader = res.body?.getReader()
       let assistantText = ''
+
       if (reader) {
         const decoder = new TextDecoder()
         while (true) {
@@ -102,18 +103,18 @@ export default function ChatPanel({ context, suggestions = [] }: Props) {
             const lastIsAssistant = prev[prev.length - 1]?.role === 'assistant'
             if (lastIsAssistant) {
               const updated = [...prev]
-              updated[updated.length - 1] = { role: 'assistant', content: assistantText }
+              updated[updated.length - 1] = { role: 'assistant' as const, content: assistantText }
               return updated
             }
-            return [...prev, { role: 'assistant', content: assistantText }]
+            return [...prev, { role: 'assistant' as const, content: assistantText }]
           })
         }
       } else {
         const txt = await res.text()
-        setMessages(prev => [...prev, { role: 'assistant', content: txt }])
+        setMessages(prev => [...prev, { role: 'assistant' as const, content: txt }])
       }
     } catch (e:any) {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Desculpe, tive um problema. Tente novamente.' }])
+      setMessages(prev => [...prev, { role: 'assistant' as const, content: 'Desculpe, tive um problema. Tente novamente.' }])
     } finally {
       setLoading(false)
     }
