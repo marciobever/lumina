@@ -14,13 +14,13 @@ export function sb(): ReturnType<typeof createClient> {
     )
   }
 
+  // 🔧 Sem db.schema aqui para evitar conflito de tipos no build
   _public = createClient(url, anon, {
     auth: { persistSession: true },
-    db:   { schema: 'lumina' as const }, // 👈 define o schema padrão do client
   })
 
   return _public
 }
 
-/** Use sempre este helper nas consultas do client/SSR */
+/** Use sempre este helper nas consultas do client/SSR (schema 'lumina') */
 export const fromL = (table: string) => sb().schema('lumina').from(table)
