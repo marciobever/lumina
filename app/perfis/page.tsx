@@ -17,7 +17,6 @@ type Props = {
     q?: string
     sector?: string
     status?: 'draft' | 'published'
-    // adsOnly?: 'true' | 'false' // REMOVIDO
   }
 }
 
@@ -42,6 +41,16 @@ function mapToCardProps(p: any) {
   }
 }
 
+// só considera perfis com alguma imagem pra card
+function hasCoverish(p: any) {
+  return Boolean(
+    (typeof p?.hero_url === 'string' && p.hero_url) ||
+    (typeof p?.cover_url === 'string' && p.cover_url) ||
+    (Array.isArray(p?.gallery_urls) && p.gallery_urls.some((u: any) => typeof u === 'string' && /^https?:\/\//.test(u))) ||
+    (typeof p?.avatar_url === 'string' && p.avatar_url)
+  )
+}
+
 export default async function PerfisPage({ searchParams }: Props) {
   const page = Math.max(1, Number(searchParams?.page ?? '1'))
 
@@ -53,7 +62,6 @@ export default async function PerfisPage({ searchParams }: Props) {
   const q = searchParams?.q?.trim() || undefined
   const sector = searchParams?.sector?.trim() || undefined
   const status = (searchParams?.status as 'draft' | 'published' | undefined) || 'published'
-  // const adsOnly = searchParams?.adsOnly === 'true' ? true : undefined // REMOVIDO
 
   const { data, total, perPage } = await listProfiles({
     page,
@@ -61,11 +69,13 @@ export default async function PerfisPage({ searchParams }: Props) {
     q,
     sector,
     status,
-    // adsOnly, // REMOVIDO
   })
 
+  // filtra só perfis com imagem (mulherada pronta)
+  const visible = Array.isArray(data) ? data.filter(hasCoverish) : []
+
   // Só 11 perfis na grade; o 12º é lookahead
-  const profiles = Array.isArray(data) ? data.slice(0, PER_PAGE_WITHOUT_AD) : []
+  const profiles = visible.slice(0, PER_PAGE_WITHOUT_AD)
 
   // Insere 1 ad DEPOIS do 6º card (se houver)
   const insertAfterIndex = Math.min(6, Math.max(0, profiles.length))
@@ -75,7 +85,7 @@ export default async function PerfisPage({ searchParams }: Props) {
   if (profiles.length > 0) grid.push({ kind: 'ad' as const })
   for (let i = insertAfterIndex; i < profiles.length; i++) grid.push({ kind: 'profile', p: profiles[i] })
 
-  // Paginação correta
+  // Paginação: usa total do backend (não o pós-filtro local) pra não "quebrar" o hasNext
   const perPageReal = perPage ?? REQUEST_SIZE
   const hasNext = total > page * perPageReal
 
@@ -107,7 +117,7 @@ export default async function PerfisPage({ searchParams }: Props) {
                   w-full rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm
                   shadow-[0_0_20px_rgba(255,0,255,0.08)]
                   flex items-center justify-center
-                  h-[64px] sm:h-[90px]               /* alturas fixas → zero CLS */
+                  h-[64px] sm:h-[90px]
                 "
               >
                 <span className="text-xs text-white/60">Carregando anúncio…</span>
