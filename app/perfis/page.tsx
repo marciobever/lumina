@@ -1,6 +1,5 @@
 // app/perfis/page.tsx
 import React from 'react'
-import FiltersBar from '@/components/FiltersBar'
 import ProfileCard from '@/components/ProfileCard'
 import Pagination from '@/components/Pagination'
 import { listProfiles } from '@/lib/queries'
@@ -50,7 +49,7 @@ export default async function PerfisPage({ searchParams }: Props) {
   const PER_PAGE_WITHOUT_AD = 11
   const REQUEST_SIZE = PER_PAGE_WITHOUT_AD + 1 // pedimos 12 p/ olhar próxima página
 
-  // filtros opcionais vindos da URL
+  // filtros opcionais vindos da URL (a busca/filters UI foi removida, mas querystrings seguem funcionando)
   const q = searchParams?.q?.trim() || undefined
   const sector = searchParams?.sector?.trim() || undefined
   const status = (searchParams?.status as 'draft' | 'published' | undefined) || 'published'
@@ -82,24 +81,34 @@ export default async function PerfisPage({ searchParams }: Props) {
 
   return (
     <div className="relative">
-      {/* TOP: Leaderboard wide (728x90 desktop / 320x100 mobile) */}
-      <section className="section pt-6">
+      {/* Título */}
+      <section className="section pt-8">
+        <div className="container">
+          <div className="mb-4 md:mb-6">
+            <h1 className="h-hero text-3xl md:text-5xl">Perfis de Especialistas</h1>
+            <p className="text-white/75 mt-2 text-balance">
+              Finanças, arquitetura, tecnologia, saúde, jurídico, educação e mais — descubra referências por nicho.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Leaderboard wide no lugar da barra (728x90 desktop / 320x100/50 mobile) */}
+      <section className="section pt-2 pb-4">
         <div className="container">
           <div className="w-full flex justify-center">
             <div className="w-full max-w-6xl flex flex-col items-center">
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
                 Publicidade
               </div>
-              {/* id específico para leaderboard */}
               <div
                 id="LeaderboardTop"
                 className="
                   w-full rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm
                   shadow-[0_0_20px_rgba(255,0,255,0.08)]
                   flex items-center justify-center
-                  h-[68px] xs:h-[90px] sm:h-[100px] md:h-[90px] 
+                  h-[64px] sm:h-[90px]               /* alturas fixas → zero CLS */
                 "
-                // alturas fixas por breakpoint evitam CLS. Ajuste se quiser outro break.
               >
                 <span className="text-xs text-white/60">Carregando anúncio…</span>
                 <noscript>Ative o JavaScript para ver o anúncio.</noscript>
@@ -109,7 +118,7 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* Script local só para o LeaderboardTop (layout já cuida de Content1..9) */}
+      {/* Script local só para o LeaderboardTop (Content1..9 já vem do layout) */}
       <Script id="gpt-leaderboardtop" strategy="afterInteractive">
         {`
           (function(){
@@ -119,9 +128,8 @@ export default async function PerfisPage({ searchParams }: Props) {
             googletag.cmd.push(function() {
               try {
                 var lbMapping = googletag.sizeMapping()
-                  .addSize([0,0],     [[320,50],[320,100]])   // mobile
-                  .addSize([728,0],   [[728,90]])             // tablet/desktop
-                  .addSize([1024,0],  [[728,90]])             // wide desktop
+                  .addSize([0,0],     [[320,100],[320,50]])
+                  .addSize([728,0],   [[728,90]])
                   .build();
 
                 var el = document.getElementById('LeaderboardTop');
@@ -145,20 +153,7 @@ export default async function PerfisPage({ searchParams }: Props) {
         `}
       </Script>
 
-      {/* Título + filtros */}
-      <section className="section pt-4">
-        <div className="container">
-          <div className="mb-5 md:mb-6">
-            <h1 className="h-hero text-3xl md:text-5xl">Perfis de Especialistas</h1>
-            <p className="text-white/75 mt-2 text-balance">
-              Finanças, arquitetura, tecnologia, saúde, jurídico, educação e mais — descubra referências por nicho.
-            </p>
-          </div>
-          <FiltersBar />
-        </div>
-      </section>
-
-      {/* Grade sem lateral + 1 ad nativo misturado (retângulo) */}
+      {/* Grade (sem lateral) + 1 ad nativo misturado */}
       <section className="pb-10">
         <div className="container">
           {grid.length > 0 ? (
@@ -166,25 +161,22 @@ export default async function PerfisPage({ searchParams }: Props) {
               {grid.map((item, i) => (
                 <div key={i} className="card-aspect">
                   {item.kind === 'ad' ? (
-                    // Card de anúncio com o mesmo visual/tamanho do card 3:4
-                    <div className="profile-card-business ad-card relative" data-ad-slot="Content3">
-                      <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 px-3 pt-3">
-                        Publicidade
-                      </div>
-                      {/* Content3: retângulo; layout.tsx já mapeia 250/300/336 + fluid */}
-                      <div
-                        id="Content3"
-                        className="w-full h-full px-3 pb-3"
-                      >
-                        <div className="
-                          w-full h-full min-h-[280px]
-                          rounded-lg border border-white/10 bg-white/5
-                          flex items-center justify-center backdrop-blur-sm
-                          shadow-[0_0_20px_rgba(255,0,255,0.08)]
-                        ">
+                    <div className="profile-card-business relative" data-ad-slot="Content3">
+                      <div className="pc-media">
+                        {/* o card é 3:4 — mantemos o container com mesmo visual das capas */}
+                        <div
+                          id="Content3"
+                          className="absolute inset-0 m-3 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
+                        >
                           <span className="text-xs text-white/60">Carregando anúncio…</span>
                           <noscript>Ative o JavaScript para ver o anúncio.</noscript>
                         </div>
+                        <div className="pc-gradient" />
+                      </div>
+                      <div className="pc-body">
+                        <div className="text-[11px] uppercase tracking-wider text-neutral-400">Publicidade</div>
+                        <div className="pc-name">Conteúdo patrocinado</div>
+                        <div className="pc-headline">Anúncio exibido automaticamente pelo Google Ad Manager.</div>
                       </div>
                     </div>
                   ) : (
