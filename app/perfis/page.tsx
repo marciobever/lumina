@@ -33,6 +33,7 @@ function mapToCardProps(p: any) {
     nome: p?.display_name ?? p?.name ?? p?.slug ?? '—',
     titulo: p?.title ?? '',
     categoria: p?.sector ?? '',
+    // ordem de preferência para a capa
     capa_url:
       (typeof p?.hero_url === 'string' && p.hero_url) ||
       (typeof p?.cover_url === 'string' && p.cover_url) ||
@@ -47,8 +48,9 @@ export default async function PerfisPage({ searchParams }: Props) {
 
   // Regra: 11 perfis + 1 ad = 12 itens na grade
   const PER_PAGE_WITHOUT_AD = 11
-  const REQUEST_SIZE = PER_PAGE_WITHOUT_AD + 1
+  const REQUEST_SIZE = PER_PAGE_WITHOUT_AD + 1 // pedimos 12 p/ olhar próxima página
 
+  // filtros opcionais vindos da URL
   const q = searchParams?.q?.trim() || undefined
   const sector = searchParams?.sector?.trim() || undefined
   const status = (searchParams?.status as 'draft' | 'published' | undefined) || 'published'
@@ -63,7 +65,10 @@ export default async function PerfisPage({ searchParams }: Props) {
     adsOnly,
   })
 
+  // Só 11 perfis na grade; o 12º é lookahead
   const profiles = Array.isArray(data) ? data.slice(0, PER_PAGE_WITHOUT_AD) : []
+
+  // Insere 1 ad DEPOIS do 6º card (se houver)
   const insertAfterIndex = Math.min(6, Math.max(0, profiles.length))
   const grid: Array<{ kind: 'profile'; p: any } | { kind: 'ad' }> = []
 
@@ -71,33 +76,35 @@ export default async function PerfisPage({ searchParams }: Props) {
   if (profiles.length > 0) grid.push({ kind: 'ad' as const })
   for (let i = insertAfterIndex; i < profiles.length; i++) grid.push({ kind: 'profile', p: profiles[i] })
 
+  // Paginação correta
   const perPageReal = perPage ?? REQUEST_SIZE
   const hasNext = total > page * perPageReal
 
   return (
     <div className="relative">
-      {/* ====== TOPO: bloco centralizado (Content2) ====== */}
-      <div className="container pt-6">
-        <div className="w-full flex justify-center">
-          <div className="w-full max-w-[336px] flex flex-col items-center">
-            <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
-            <div
-              id="Content2"
-              className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-            >
-              <span className="text-xs text-white/60">Carregando anúncio…</span>
-              <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+      {/* TOP: Slot com o MESMO visual da home (retângulo responsivo) */}
+      <section className="section pt-6">
+        <div className="container">
+          <div className="w-full flex justify-center">
+            <div className="w-full max-w-[336px] flex flex-col items-center">
+              <div className="ad-label">Publicidade</div>
+              {/* O layout cria/exibe este slot automaticamente
+                 path: /23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Content2 */}
+              <div id="Content2" className="ad-block ad--rect">
+                <span className="loading">Carregando anúncio…</span>
+                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* ====== Título + filtros ====== */}
-      <section className="section">
+      {/* Título + filtros */}
+      <section className="section pt-4">
         <div className="container">
           <div className="mb-5 md:mb-6">
             <h1 className="h-hero text-3xl md:text-5xl">Perfis de Especialistas</h1>
-            <p className="text-white/75 mt-2">
+            <p className="text-white/75 mt-2 text-balance">
               Finanças, arquitetura, tecnologia, saúde, jurídico, educação e mais — descubra referências por nicho.
             </p>
           </div>
@@ -105,81 +112,36 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* ====== Grade + Lateral ====== */}
+      {/* Grade (sem lateral) com 1 ad misturado aos cards */}
       <section className="pb-10">
         <div className="container">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6">
-            {/* Coluna principal */}
-            <div className="min-w-0">
-              {grid.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                  {grid.map((item, i) => (
-                    <div key={i} className="card-aspect">
-                      {item.kind === 'ad' ? (
-                        // Card nativo no meio da grade (Content3)
-                        <div className="h-full w-full">
-                          <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
-                            Publicidade
-                          </div>
-                          <div
-                            id="Content3"
-                            className="h-full w-full rounded-xl border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-                          >
-                            <span className="text-xs text-white/60">Carregando anúncio…</span>
-                            <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                          </div>
-                        </div>
-                      ) : (
-                        <ProfileCard p={mapToCardProps(item.p)} />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <>
-                  <div className="card p-8 text-white/70">
-                    Nenhum perfil encontrado para os filtros aplicados.
-                  </div>
-
-                  {/* Mesmo sem resultados, mostra um bloco de anúncio abaixo (Content4) */}
-                  <div className="mt-6 w-full flex justify-center">
-                    <div className="w-full max-w-[336px]">
-                      <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
-                        Publicidade
-                      </div>
-                      <div
-                        id="Content4"
-                        className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-                      >
-                        <span className="text-xs text-white/60">Carregando anúncio…</span>
+          {grid.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+              {grid.map((item, i) => (
+                <div key={i} className="card-aspect">
+                  {item.kind === 'ad' ? (
+                    // Card de anúncio com mesmo tamanho e visual consistente do diretório
+                    <div className="profile-card-business ad-card relative" data-ad-slot="Content3">
+                      <div className="ad-label">Publicidade</div>
+                      {/* Path compatível com WP: Content3, mapeado como retângulo */}
+                      <div id="Content3" className="ad-block ad--rect">
+                        <span className="loading">Carregando anúncio…</span>
                         <noscript>Ative o JavaScript para ver o anúncio.</noscript>
                       </div>
                     </div>
-                  </div>
-                </>
-              )}
-
-              {/* Paginação */}
-              <div className="mt-8">
-                <Pagination page={page} hasNext={!!hasNext} />
-              </div>
+                  ) : (
+                    <ProfileCard p={mapToCardProps(item.p)} />
+                  )}
+                </div>
+              ))}
             </div>
+          ) : (
+            <div className="card p-8 text-white/70">Nenhum perfil encontrado para os filtros aplicados.</div>
+          )}
 
-            {/* Lateral (lg+) — Content5 */}
-            <aside className="hidden lg:block">
-              <div className="sticky top-24">
-                <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 text-center">
-                  Publicidade
-                </div>
-                <div
-                  id="Content5"
-                  className="w-[300px] min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-                >
-                  <span className="text-xs text-white/60">Carregando anúncio…</span>
-                  <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                </div>
-              </div>
-            </aside>
+          {/* Paginação */}
+          <div className="mt-8">
+            <Pagination page={page} hasNext={!!hasNext} />
           </div>
         </div>
       </section>
