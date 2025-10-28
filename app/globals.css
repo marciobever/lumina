@@ -1,42 +1,349 @@
-/* ================== Ads (estilo unificado) ================== */
-.ad-wrap{ display:flex; justify-content:center; }
-.ad-block{
-  width:100%;
-  border-radius: 16px;
-  border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.05);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 0 20px rgba(255,0,255,.08);
-  display:flex; align-items:center; justify-content:center;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ================== Tokens ================== */
+:root {
+  --accent: 255, 0, 191;   /* roxo/fúcsia */
+  --accent2: 99, 102, 241; /* indigo */
+  color-scheme: light;
+}
+
+* { -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; }
+
+/* ================== Base ================== */
+body {
+  @apply text-slate-100 antialiased font-sans overflow-x-hidden;
+  background:
+    radial-gradient(1200px 600px at 20% -10%, rgba(var(--accent),0.12), transparent 60%),
+    radial-gradient(1000px 520px at 90% -10%, rgba(var(--accent2),0.10), transparent 60%),
+    linear-gradient(180deg, #0b0e1a 0%, #0a0d18 60%, #0a0c16 100%);
+}
+
+.container { @apply max-w-6xl mx-auto px-4; }
+
+/* Tipografia (via next/font no layout) */
+.font-display { font-family: var(--font-display), ui-serif, Georgia, 'Times New Roman', serif; }
+.font-sans    { font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial; }
+
+/* ================== Botões ================== */
+.btn { @apply inline-flex items-center justify-center rounded-xl px-5 py-2.5 border transition; }
+.btn-primary {
+  @apply border-transparent;
+  background: linear-gradient(90deg, rgba(var(--accent),0.95), rgba(var(--accent2),0.95));
+  color: white;
+  box-shadow: 0 8px 30px rgba(var(--accent),0.25), inset 0 0 0 1px rgba(255,255,255,0.06);
+}
+.btn-primary:hover { filter: brightness(1.05); }
+
+/* ================== Cards ================== */
+.card { @apply rounded-2xl border overflow-hidden bg-white/[0.04] border-white/[0.08] backdrop-blur-md; }
+.profile-card { @apply relative overflow-hidden rounded-2xl bg-white/[0.03]; }
+.profile-card:hover { box-shadow: 0 12px 36px rgba(var(--accent),0.22), inset 0 0 0 1px rgba(255,255,255,0.06); transform: translateY(-2px); transition: all .25s ease; }
+.img-smooth { image-rendering:auto; -webkit-mask-image: radial-gradient(white 98%, transparent 100%); mask-image: radial-gradient(white 98%, transparent 100%); }
+
+/* ================== Seções ================== */
+.section { @apply py-10; }
+.hero    { @apply pt-16 md:pt-24 pb-10; }
+
+/* ================== Títulos ================== */
+.neon-white { text-shadow: 0 0 10px rgba(var(--accent),0.45), 0 0 30px rgba(var(--accent2),0.25); }
+.h-title   { @apply font-display font-black leading-tight; }
+.h-hero    { @apply text-4xl md:text-6xl h-title; }
+.h-section { @apply text-2xl md:text-3xl font-display font-bold; }
+
+/* ================== Busca ================== */
+.search-wrap { @apply relative mx-auto mt-6 max-w-2xl; filter: drop-shadow(0 12px 36px rgba(var(--accent),0.16)); }
+.search-box  { @apply w-full rounded-2xl border border-white/[0.08] bg-white/[0.04] px-5 py-4 text-base md:text-lg placeholder:text-white/65 focus:outline-none; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03); }
+
+/* Gradiente de leitura na imagem do card */
+.card-gradient { @apply pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent; }
+
+/* Clamp util */
+.line-clamp-2{ display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+/* ================== Header ================== */
+.header-glass{
+  @apply sticky top-0 z-40;
+  background: linear-gradient(180deg, rgba(12,15,28,0.72), rgba(12,15,28,0.55));
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.25);
+}
+.nav-link{ @apply text-sm text-white/85 relative; }
+.nav-link::after{
+  content:''; position:absolute; left:0; bottom:-6px; height:2px; width:0;
+  background: linear-gradient(90deg, rgba(var(--accent),1), rgba(var(--accent2),1));
+  transition: width .25s ease;
+}
+.nav-link:hover::after{ width:100%; }
+
+/* Linha neon animada sob o header */
+.neon-separator {
+  @apply w-full h-[2px];
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(var(--accent),1) 40%, rgba(var(--accent2),1) 60%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  filter: drop-shadow(0 0 8px rgba(var(--accent),0.7));
+  animation: shimmerX 3.2s linear infinite;
+}
+@keyframes shimmerX { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* ================== Logo (brilho real) ================== */
+.logo-aura {
+  background: radial-gradient(120px 60px at 60% 40%, rgba(var(--accent),0.30), rgba(0,0,0,0) 60%),
+              radial-gradient(140px 70px at 20% 60%, rgba(var(--accent2),0.25), rgba(0,0,0,0) 70%);
+  filter: blur(16px);
+  pointer-events:none;
+}
+.logo-text-white { @apply text-white; text-shadow: 0 0 10px rgba(255,255,255,0.15); }
+.logo-text-gradient {
+  @apply text-transparent bg-clip-text;
+  background-image: linear-gradient(90deg, #f0abfc, #a78bfa);
+  text-shadow: 0 0 18px rgba(167,139,250,0.45);
+}
+.logo-shimmer { animation: logoShine 6s ease-in-out infinite; }
+@keyframes logoShine {
+  0%,100% { filter: drop-shadow(0 0 6px rgba(var(--accent),0.25)); }
+  50%     { filter: drop-shadow(0 0 18px rgba(var(--accent2),0.45)); }
+}
+
+/* ================== Footer (limpo, menor, com neon invertido) ================== */
+.footer{ background: transparent; position: relative; }
+.footer .container { padding-top: 18px; padding-bottom: 22px; } /* menor */
+.footer-wrap{
+  display:grid; grid-template-columns: 1.2fr 1fr; gap:1.25rem; align-items:center;
+}
+@media (max-width: 768px){ .footer-wrap{ grid-template-columns: 1fr; gap:1rem; } }
+.footer-brand{ display:flex; flex-direction:column; gap:.35rem; }
+.footer-tagline{ color:rgba(255,255,255,.75); max-width:36rem; font-size:.95rem; }
+
+/* reduzir brilho/aura da logo só no rodapé */
+.footer .logo-aura{ transform: scale(.7); filter: blur(10px); opacity:.55; }
+
+/* links à direita */
+.footer-links{ display:flex; flex-wrap:wrap; gap:1rem 1.25rem; justify-content:flex-end; }
+.footer-links a{ color:rgba(255,255,255,.85); }
+.footer-links a:hover{ text-decoration:underline; }
+
+/* Linha neon do rodapé (invertida) */
+.neon-separator-footer{
+  width:100%; height:2px;
+  background: linear-gradient(270deg, /* invertido */
+    rgba(255,255,255,0) 0%,
+    rgba(var(--accent2),1) 40%,
+    rgba(var(--accent),1) 60%,
+    rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  filter: drop-shadow(0 0 8px rgba(var(--accent2),0.7));
+  animation: shimmerXReverse 3.2s linear infinite;
+}
+@keyframes shimmerXReverse {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ================== Newsletter Section (abaixo dos cards) ================== */
+.nl-section{ position: relative; padding: 56px 0; overflow:hidden; }
+.nl-lines{ position:absolute; inset:0; width:100%; height:100%; opacity:.35; }
+.nl-card{
+  position: relative; margin: 0 auto; max-width: 720px;
+  padding: 28px 24px; border-radius: 20px; backdrop-filter: blur(14px);
+  background: linear-gradient(135deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.05);
+}
+/* fade suave no fim para não criar "banda" antes do rodapé */
+.nl-section::after{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:60px;
+  background: linear-gradient(to bottom, rgba(10,12,22,0) 0%, rgba(10,12,22,0.9) 70%, rgba(10,12,22,1) 100%);
+}
+
+/* Form da newsletter (visual minimal) */
+.nl-hero{ display:flex; flex-direction:column; gap:.5rem; margin-top:16px; }
+@media (min-width: 640px){ .nl-hero{ flex-direction:row; align-items:center; } }
+.nlh-input{
+  flex:1; padding:.9rem 1.1rem; border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+  color:#fff; outline:none;
+}
+.nlh-input::placeholder{ color: rgba(255,255,255,0.7); }
+.nlh-btn{
+  border-radius:999px; padding:.9rem 1.25rem; font-weight:600;
+  background: linear-gradient(90deg, rgba(var(--accent),0.95), rgba(var(--accent2),0.95));
+  color:#fff; border:1px solid rgba(255,255,255,0.06);
+}
+.nlh-btn:hover{ filter:brightness(1.06); }
+.nlh-hint{ text-align:center; color:rgba(255,255,255,.65); font-size:.8rem; margin-top:.25rem; }
+@media (min-width:640px){ .nlh-hint{ text-align:right; margin-top:0; } }
+
+/* ================== Utilitários ================== */
+.full-bleed { width:100vw; position:relative; left:50%; right:50%; margin-left:-50vw; margin-right:-50vw; }
+
+/* Backdrop de linhas global, se usar */
+.backdrop-lines {
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,.9) 65%, rgba(0,0,0,0) 100%);
+}
+
+/* CTA do hero (pílulas) */
+.cta-wrap { @apply mt-5 flex flex-col items-center gap-3; }
+.cta-primary {
+  @apply inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-base md:text-lg font-medium border border-white/[0.06];
+  background: linear-gradient(90deg, rgba(var(--accent),0.95), rgba(var(--accent2),0.95));
+  box-shadow: 0 12px 36px rgba(var(--accent),0.28), inset 0 0 0 1px rgba(255,255,255,0.06);
+  color: #fff;
+}
+.cta-primary:hover { filter: brightness(1.05); }
+.cta-row { @apply grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-xl; }
+.cta-pill { @apply rounded-xl border border-white/[0.08] bg-white/[0.05] px-4 py-3 text-sm text-white/90 backdrop-blur-md; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.04); }
+.cta-pill:hover { @apply bg-white/[0.07]; }
+.cta-pill .k { @apply text-xs uppercase tracking-widest text-white/60; }
+.cta-pill .t { @apply font-medium text-white; }
+
+/* ====================================================================== */
+/* ================== PERFIS DE NEGÓCIOS (cards + filtros + pager) ====== */
+/* ====================================================================== */
+
+/* ProfileCard — negócios */
+.profile-card-business { @apply rounded-2xl overflow-hidden border border-white/10 bg-white/[0.03]; transition: transform .25s ease, box-shadow .25s ease; }
+.profile-card-business:hover { transform: translateY(-3px); box-shadow: 0 16px 40px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,0.06); }
+
+.pc-media { position: relative; aspect-ratio: 3 / 4; overflow: hidden; }
+.pc-img { width:100%; height:100%; object-fit: cover; transform: scale(1.02); transition: transform .45s ease; }
+.profile-card-business:hover .pc-img { transform: scale(1.06); }
+.pc-gradient { position:absolute; inset:0; background: linear-gradient(to top, rgba(7,10,20,.9) 10%, rgba(7,10,20,.0) 55%); }
+
+.pc-sector {
+  position: absolute; left: 12px; top: 12px;
+  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
+  color: #fff; padding: 6px 10px; border-radius: 999px;
+  background: linear-gradient(90deg, rgba(var(--accent),.95), rgba(var(--accent2),.95));
+  border: 1px solid rgba(255,255,255,.08);
+}
+
+.pc-body { padding: 12px 14px 14px; display:flex; flex-direction:column; gap:6px; }
+.pc-name { @apply font-display font-bold; font-size: 1.05rem; line-height: 1.2; }
+.pc-headline { color: rgba(255,255,255,.80); font-size: .92rem; }
+.pc-meta { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+.pc-chip { font-size: .72rem; color:#fff; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.12); padding: 4px 8px; border-radius: 999px; }
+.pc-chip-dim { color: rgba(255,255,255,.85); background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); }
+
+/* Filters — setores em pílulas */
+.filters-wrap { display:flex; flex-wrap:wrap; gap:.5rem; }
+.filter-pill {
+  font-size:.85rem; padding:.5rem .85rem; border-radius: 999px;
+  background: rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.10);
+  color:#fff; transition: background .2s ease, border-color .2s ease;
+}
+.filter-pill:hover { background: rgba(255,255,255,.1); }
+.filter-pill.is-active { background: linear-gradient(90deg, rgba(var(--accent),.95), rgba(var(--accent2),.95)); border-color: transparent; }
+
+/* Paginação */
+.pager { display:flex; align-items:center; justify-content:center; gap:.75rem; }
+.pager-btn { @apply btn border-white/10 text-sm; }
+.pager-btn.is-disabled { pointer-events:none; opacity:.4; }
+.pager-info { color: rgba(255,255,255,.75); font-size:.9rem; }
+.pager-info strong { color:#fff; }
+
+/* Mesma proporção de todos os cards (inclui Ad nativo) */
+.card-aspect { aspect-ratio: 3 / 4; }
+
+/* Ad-card com tipografia um pouco maior pra não “sumir” */
+.profile-card-business[data-ad-slot] .pc-name { font-size: 1.05rem; }
+.profile-card-business[data-ad-slot] .pc-headline { font-size: .93rem; }
+.profile-card-business[data-ad-slot] .pc-chip { opacity: .95; }
+
+/* ===== Galeria 4 colunas / 8 imagens com zoom (sem clique) ===== */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: .65rem;
+}
+@media (min-width: 640px) { .gallery-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 768px) { .gallery-grid { grid-template-columns: repeat(4, 1fr); } }
+
+.gallery-item {
   position: relative;
-}
-
-/* rótulo acima */
-.ad-label{
-  font-size:11px; letter-spacing:.16em; text-transform:uppercase;
-  color: rgba(255,255,255,.7);
-  text-align:center;
-  margin-bottom:.4rem;
-}
-
-/* variações de tamanho */
-.ad--rect   { max-width:336px; min-height:280px; }
-.ad--lb     { max-width:970px; min-height:90px; }
-.ad--sky    { width:300px; min-height:600px; }
-
-@media (max-width: 768px){
-  .ad--lb { max-width: 100%; min-height: 50px; }
-}
-
-/* card de grade 3:4 */
-.ad-card {
-  aspect-ratio: 3 / 4;
-  border-radius: 16px;
+  overflow: hidden;
+  border-radius: 14px;
   border: 1px solid rgba(255,255,255,.10);
-  background: rgba(255,255,255,.05);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 0 20px rgba(255,0,255,.08);
-  display:flex; align-items:center; justify-content:center;
-  position:relative;
+  background: rgba(255,255,255,.04);
+  /* Suporte a toque: */
+  touch-action: manipulation;
 }
-.ad-card .ad-label { position:absolute; top:8px; left:0; right:0; margin:0; }
+.gallery-img {
+  width: 100%;
+  height: 0;
+  padding-bottom: 100%;          /* quadrado perfeito */
+  object-fit: cover;
+  transform: scale(1.02);
+  transition: transform .35s ease, filter .35s ease;
+  display: block;
+  background-position: center;
+  background-size: cover;
+}
+/* Truque para manter quadrado com <img>: posicionamento absoluto */
+.gallery-item .gallery-img {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+}
+
+/* Hover (desktop) e Active (mobile) para zoom */
+.gallery-item:hover .gallery-img,
+.gallery-item:active .gallery-img {
+  transform: scale(1.08);
+  filter: saturate(1.05) brightness(1.02);
+}
+
+/* Suaviza o movimento e dá sensação de “vidro” */
+.gallery-item::after {
+  content:'';
+  position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(255,255,255,.00) 60%, rgba(0,0,0,.18) 100%);
+  pointer-events:none;
+}
+
+/* ================== Editorial / Prose ================== */
+.prose-dark {
+  --tw-prose-body: rgba(255,255,255,.88);
+  --tw-prose-headings: #fff;
+  --tw-prose-bold: #fff;
+  --tw-prose-quotes: rgba(255,255,255,.9);
+  --tw-prose-links: rgba(255,255,255,.92);
+  --tw-prose-hr: rgba(255,255,255,.08);
+  --tw-prose-counters: rgba(255,255,255,.6);
+  --tw-prose-bullets: rgba(255,255,255,.55);
+  --tw-prose-th-borders: rgba(255,255,255,.1);
+  --tw-prose-td-borders: rgba(255,255,255,.08);
+}
+.reading-measure { max-width: 68ch; }
+.reading-loose   { line-height: 1.85; letter-spacing: .004em; }
+.text-balance    { text-wrap: balance; }
+.hyphens-auto    { hyphens: auto; }
+.indent-para p + p { text-indent: 1.25em; }
+
+.quote-glow {
+  border-left: 4px solid rgba(var(--accent),1);
+  background: linear-gradient(90deg, rgba(255,255,255,0.03), transparent 60%);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+  border-radius: 14px;
+}
+
+.dropcap:first-letter{
+  float:left; font-family: var(--font-display);
+  font-weight: 800; font-size: 3.2rem; line-height: .85;
+  margin: .08em .22em 0 0;
+  color:#fff; text-shadow: 0 0 18px rgba(var(--accent2), .35);
+}
+
+.prose-dark h2, .prose-dark h3 {
+  font-family: var(--font-display);
+  text-shadow: 0 0 10px rgba(255,255,255,0.08);
+}
+
+.prose-dark ul>li::marker { color: rgba(255,255,255,.55); }
+
+.hr-soft {
+  height: 1px; border: 0; margin: 1.25rem 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.12), transparent);
+}
