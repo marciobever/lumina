@@ -1,6 +1,6 @@
 // app/admin/AdminDashboard.tsx
 import React from 'react'
-import { db } from '@/lib/supabaseServer'
+import { getAdminMetrics, listProfiles, type Profile } from '@/lib/queries'
 
 export type JobStatus = 'queued' | 'running' | 'failed' | 'completed' | 'cancelled'
 
@@ -57,7 +57,7 @@ function Stat({ label, value }: StatProps) {
   )
 }
 
-/** Converte status do banco (pt/en) em JobStatus do painel */
+/** Converte status (published/draft) em um JobStatus visual do painel */
 function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
   switch ((dbStatus || '').toLowerCase()) {
     case 'published':
@@ -71,25 +71,13 @@ function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
   }
 }
 
-async function fetchRealServer(): Promise<DashboardData> {
-  const supa = db() // já aponta para o schema 'lumina'
+async function fetchData(): Promise<DashboardData> {
+  // Métricas (NocoDB / fallback local via lib/queries)
+  const metrics = await getAdminMetrics()
 
-  // Contadores (published x draft)
-  const [{ count: cPub }, { count: cDraft }] = await Promise.all([
-    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'published'),
-    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
-  ])
-
-  // Lista de perfis recentes para preencher "jobs"
-  const { data: perfis, error } = await supa
-    .from('profiles')
-    .select('id, display_name, title, sector, status, created_at, updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(12)
-
-  if (error) throw error
-
-  const recentJobs: DashboardJob[] = (perfis ?? []).map((p: any) => ({
+  // Perfis recentes para preencher a grade “Jobs recentes”
+  const { data: perfis } = await listProfiles({ page: 1, perPage: 12 })
+  const recentJobs: DashboardJob[] = (perfis as Profile[]).map((p) => ({
     id: p.id,
     status: statusDbToJobStatus(p.status),
     nome: p.display_name ?? '(sem nome)',
@@ -112,10 +100,10 @@ async function fetchRealServer(): Promise<DashboardData> {
     })
   }
 
-  // 🔒 Evita precedência errada com ?? após operações aritméticas
-  const published = cPub ?? 0
-  const drafts = cDraft ?? 0
-  const pending = drafts // no seu fluxo, rascunho = pendente
+  const published = metrics.publishedProfiles ?? 0
+  const total = metrics.totalProfiles ?? 0
+  const drafts = Math.max(0, total - published)
+  const pending = drafts // no teu fluxo, rascunho = pendente
 
   return {
     counters: {
@@ -134,7 +122,7 @@ export default async function AdminDashboard() {
   let error: string | null = null
 
   try {
-    data = await fetchRealServer()
+    data = await fetchData()
   } catch (e: any) {
     error = e?.message || 'Falha ao carregar'
   }
@@ -144,7 +132,8 @@ export default async function AdminDashboard() {
       <div className="container py-10">
         <div className="text-rose-300">Erro: {error}</div>
         <p className="text-white/60 mt-2 text-sm">
-          Verifique se <code>supabaseServer</code> usa o schema <code>lumina</code> e se há permissão de SELECT em <code>profiles</code>.
+          Verifique as variáveis de NocoDB no <code>.env</code> (<code>NOCODB_BASE_URL</code>, <code>NOCODB_API_TOKEN</code>,
+          <code>NOCODB_TABLE_ID</code>) ou ative o fallback local em <code>data/profiles.json</code>.
         </p>
       </div>
     )
