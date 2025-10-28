@@ -1,3 +1,4 @@
+// app/api/admin/profiles/start/route.ts
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,7 @@ function requireEnv(name: string) {
   if (!v) throw new Error(`${name} not set`);
   return v;
 }
+
 function slugify(s: string) {
   return String(s)
     .normalize('NFKD')
@@ -32,6 +34,7 @@ async function nc(path: string, init?: RequestInit) {
     },
     cache: 'no-store',
   });
+
   const text = await res.text();
   if (!res.ok) throw new Error(`NocoDB ${res.status}: ${text || res.statusText}`);
   try { return JSON.parse(text); } catch { return {}; }
@@ -40,7 +43,7 @@ async function nc(path: string, init?: RequestInit) {
 export async function POST(req: NextRequest) {
   try {
     const { pathname } = new URL(req.url);
-    // Deriva a ação do caminho: suporta .../start e .../create
+    // Suporta .../start e .../create
     const action = pathname.includes('/create') ? 'create' : 'start';
 
     const body = await req.json().catch(() => ({}));
@@ -58,7 +61,7 @@ export async function POST(req: NextRequest) {
 
     const slug = slugify(name);
 
-    // 1) Cria no NocoDB em "queued" (apenas colunas seguras)
+    // 1) Cria no NocoDB (somente colunas existentes/seguras)
     const tableId = requireEnv('NOCODB_TABLE_ID');
     const payload: Record<string, any> = {
       status: 'queued',
@@ -85,7 +88,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2) Dispara o N8N
+    // 2) Dispara o n8n
     const n8nUrl =
       process.env.N8N_START_WEBHOOK ||
       process.env.NEXT_PUBLIC_N8N_START_WEBHOOK;
@@ -96,7 +99,7 @@ export async function POST(req: NextRequest) {
         Id: recordId,
         slug,
         action,
-        warn: 'N8N_START_WEBHOOK not set — registro criado no NocoDB, mas N8N não foi disparado.'
+        warn: 'N8N_START_WEBHOOK not set — registro criado no NocoDB, mas n8n não foi disparado.'
       });
     }
 
@@ -107,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     const n8nPayload = {
       source: 'lumina.admin.create',
-      action,            // ← ‘create’ ou ‘start’, conforme URL
+      action,            // "create" ou "start"
       record_id: recordId,
       name,
       slug,
@@ -115,7 +118,7 @@ export async function POST(req: NextRequest) {
       skin_tone,
       age,
       style,
-      nicho,            // ← incluído para a “segunda perna” (conteúdo)
+      nicho,             // para a segunda perna (conteúdo)
     };
 
     const n8nRes = await fetch(n8nUrl, {
@@ -132,7 +135,7 @@ export async function POST(req: NextRequest) {
         Id: recordId,
         slug,
         action,
-        warn: `N8N ${n8nRes.status}: ${errText || n8nRes.statusText}`
+        warn: `n8n ${n8nRes.status}: ${errText || n8nRes.statusText}`
       });
     }
 
