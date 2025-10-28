@@ -16,7 +16,8 @@ type Props = {
     page?: string
     q?: string
     sector?: string
-    status?: 'draft' | 'published'
+    nicho?: string
+    status?: 'draft' | 'published' | 'queued' | 'processing' | 'done' | string
   }
 }
 
@@ -45,9 +46,10 @@ function mapToCardProps(p: any) {
 function hasCoverish(p: any) {
   return Boolean(
     (typeof p?.hero_url === 'string' && p.hero_url) ||
-    (typeof p?.cover_url === 'string' && p.cover_url) ||
-    (Array.isArray(p?.gallery_urls) && p.gallery_urls.some((u: any) => typeof u === 'string' && /^https?:\/\//.test(u))) ||
-    (typeof p?.avatar_url === 'string' && p.avatar_url)
+      (typeof p?.cover_url === 'string' && p.cover_url) ||
+      (Array.isArray(p?.gallery_urls) &&
+        p.gallery_urls.some((u: any) => typeof u === 'string' && /^https?:\/\//.test(u))) ||
+      (typeof p?.avatar_url === 'string' && p.avatar_url)
   )
 }
 
@@ -61,13 +63,20 @@ export default async function PerfisPage({ searchParams }: Props) {
   // filtros opcionais vindos da URL
   const q = searchParams?.q?.trim() || undefined
   const sector = searchParams?.sector?.trim() || undefined
-  const status = (searchParams?.status as 'draft' | 'published' | undefined) || 'published'
+  const nicho = searchParams?.nicho?.trim() || undefined
+
+  // ⚠️ Não filtramos mais por 'published' por padrão, para incluir 'done/queued'
+  // Se quiser forçar, passe ?status=published na URL
+  const status =
+    (searchParams?.status as 'draft' | 'published' | 'queued' | 'processing' | 'done' | string | undefined) ||
+    undefined
 
   const { data, total, perPage } = await listProfiles({
     page,
     perPage: REQUEST_SIZE,
     q,
     sector,
+    nicho,
     status,
   })
 
