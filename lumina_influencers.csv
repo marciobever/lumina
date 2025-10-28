@@ -1,2 +1,0 @@
-slug,race,tone,age,style,cluster,guide_url,guide_weight,seed_base,model_ref,face_mode,image_size,n_images,outputs_prefix,status,runware_task_ids,error,prompt_cover,prompt_gallery
-isabela-freitas,Latina,fair,27,editorial,latina_fair,https://example.com/guide.jpg,0.62,500527,rundiffusion:130@100,ipadapter,square,9,lumina/outputs,queued,[],,,
