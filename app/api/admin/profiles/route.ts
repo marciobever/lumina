@@ -13,7 +13,6 @@ export async function GET(req: Request) {
   const q       = searchParams.get('q')       ?? undefined
   const sector  = searchParams.get('sector')  ?? undefined
   const status  = searchParams.get('status')  ?? undefined
-  // const adsOnly = searchParams.get('adsOnly') === 'true' // ❌ removido
 
   try {
     const result = await listProfiles({ page, perPage, q, sector, status })
