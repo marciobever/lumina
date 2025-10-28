@@ -115,8 +115,9 @@ function mapRowToProfile(row: AnyObj): Profile {
     article: row.article ?? null,
     quiz: row.quiz ?? null,
     seo: row.seo ?? null,
-    created_at: row.created_at ?? ts,
-    updated_at: row.updated_at ?? ts,
+    // aceita campos do sistema do NocoDB (CreatedAt/UpdatedAt) e mantém compat c/ snake_case
+    created_at: row.created_at ?? row.CreatedAt ?? ts,
+    updated_at: row.updated_at ?? row.UpdatedAt ?? ts,
     hero_photo_id: row.hero_photo_id ?? null,
   }
 }
@@ -148,7 +149,7 @@ export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
 
 export async function listSimilarProfiles(profileId: string, tags: string[] = [], limit = 6) {
   const t = tableId()
-  const json = await nc(`/api/v2/tables/${t}/records?limit=${limit * 4}&sort=-created_at`)
+  const json = await nc(`/api/v2/tables/${t}/records?limit=${limit * 4}&sort=-UpdatedAt`)
   let list: AnyObj[] = (json?.list ?? []).filter(
     (r: AnyObj) => String(r.id ?? r.Id) !== String(profileId) && (r.status ?? "published") === "published"
   )
@@ -186,15 +187,20 @@ export async function listProfiles(params: ListParams = {}) {
   if (params.adsOnly) wh.push(encodeURIComponent(`(exibir_anuncios,eq,true)`))
   if (params.status) wh.push(encodeURIComponent(`(status,eq,${params.status})`))
 
-  const qs = `${wh.length ? `where=${wh.join("&where=")}&` : ""}limit=${perPage}&offset=${offset}&sort=-updated_at`
+  const qs = `${wh.length ? `where=${wh.join("&where=")}&` : ""}limit=${perPage}&offset=${offset}&sort=-UpdatedAt`
   const json = await nc(`/api/v2/tables/${t}/records?${qs}`)
   const list: AnyObj[] = json?.list ?? []
   if (params.q) {
     const k = params.q.toLowerCase()
     // filtro extra client-side
-    list.splice(0, list.length, ...list.filter((r: AnyObj) =>
+    const refined = list.filter((r: AnyObj) =>
       [r.display_name, r.title, r.slug, r.city].some((v) => String(v || "").toLowerCase().includes(k))
-    ))
+    )
+    return {
+      data: refined.map(mapRowToProfile) as Profile[],
+      total: Number(json?.pageInfo?.totalRows || refined.length),
+      page, perPage
+    }
   }
   return {
     data: list.map(mapRowToProfile) as Profile[],
@@ -206,10 +212,10 @@ export async function listProfiles(params: ListParams = {}) {
 export async function listFeatured(limit = 12) {
   const lim = Math.max(1, Math.min(50, limit))
   const t = tableId()
-  // status aceitos e precisa ter cover_url preenchida
-  const w1 = encodeURIComponent(`(status,in,cover_done|gallery_done|published)`)
-  const w2 = encodeURIComponent(`(cover_url,neq,)`)
-  const url = `/api/v2/tables/${t}/records?where=${w1}&where=${w2}&limit=${lim}&sort=-updated_at`
+  // status aceitos (inclui "done") + precisa ter cover_url preenchida
+  const wStatus = encodeURIComponent(`(status,in,done|cover_done|gallery_done|published)`)
+  const wCover  = encodeURIComponent(`(cover_url,neq,)`)
+  const url = `/api/v2/tables/${t}/records?where=${wStatus}&where=${wCover}&limit=${lim}&sort=-UpdatedAt`
   const json = await nc(url)
   const list: AnyObj[] = json?.list ?? []
   const data = list.map(mapRowToProfile)
