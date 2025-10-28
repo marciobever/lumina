@@ -8,49 +8,56 @@ import NeonHero from '@/components/NeonHero'
 import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
 
+type CardItem = {
+  slug: string
+  nome: string
+  titulo?: string | null
+  categoria?: string | null
+  capa_url?: string | null
+}
+
 export default async function Page() {
-  let featured: any[] = []
+  let featured: CardItem[] = []
   try {
     const { data } = await listFeatured(12)
-    featured = Array.isArray(data) ? data : []
-  } catch {
+
+    // Aceita somente registros com os 3 campos essenciais
+    featured = (Array.isArray(data) ? data : [])
+      .map((p: any) => {
+        const nome = (p.display_name ?? p.name ?? '').toString().trim()
+        const slug = (p.slug ?? '').toString().trim()
+        const capa = (p.cover_url ?? '').toString().trim()
+        return {
+          ok: !!nome && !!slug && !!capa,
+          data: {
+            slug,
+            nome,
+            titulo: p.title ?? null,
+            categoria: p.sector ?? null,
+            capa_url: capa,
+          } as CardItem,
+        }
+      })
+      .filter((x) => x.ok)
+      .map((x) => x.data)
+  } catch (e) {
+    // em Noco-only, se der erro é melhor retornar lista vazia
     featured = []
   }
 
-  // Aceita somente registros com os 3 campos essenciais
-  const cards = featured
-    .map((p) => {
-      const nome =
-        (p.display_name ?? p.name ?? '').toString().trim()
-      const slug =
-        (p.slug ?? '').toString().trim()
-      const capa =
-        (p.cover_url ?? '').toString().trim()
-
-      return {
-        ok: !!nome && !!slug && !!capa,
-        data: {
-          slug,
-          nome,
-          titulo: p.title ?? null,
-          categoria: p.sector ?? null,
-          capa_url: capa,
-        },
-      }
-    })
-    .filter((x) => x.ok)
-    .map((x) => x.data)
-
   return (
     <div className="relative bg-[#050010] text-white">
+      {/* Fundo neon no topo */}
       <BackdropLines />
 
+      {/* BLOCO SUPERIOR */}
       <section
         className="relative z-10 min-h-[92vh] flex flex-col items-center"
         aria-label="Hero + busca + publicidade"
       >
         <NeonHero />
 
+        {/* Busca */}
         <div className="w-full flex flex-col items-center px-4 mt-2 md:mt-0">
           <form
             action="/perfis"
@@ -71,6 +78,7 @@ export default async function Page() {
             </button>
           </form>
 
+          {/* Slot de publicidade */}
           <div className="w-full flex justify-center mt-8">
             <div className="w-full max-w-[336px] flex flex-col items-center">
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
@@ -94,6 +102,7 @@ export default async function Page() {
         </div>
       </section>
 
+      {/* DESTAQUES */}
       <section
         id="destaques"
         className="relative section scroll-mt-24 bg-gradient-to-b from-transparent via-[#08001A]/80 to-[#050010]"
@@ -107,12 +116,19 @@ export default async function Page() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-            {cards.map((p) => (
+            {featured.map((p) => (
               <div key={p.slug} className="aspect-[3/4]">
                 <ProfileCard p={p} />
               </div>
             ))}
           </div>
+
+          {/* Estado vazio simples */}
+          {featured.length === 0 && (
+            <div className="text-white/60 text-sm mt-4">
+              Nenhum destaque disponível no momento.
+            </div>
+          )}
         </div>
       </section>
 
