@@ -1,35 +1,38 @@
 // app/admin/AdminDashboard.tsx
-import React from 'react'
-import { getAdminMetrics, listProfiles, type Profile } from '@/lib/queries'
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
-export type JobStatus = 'queued' | 'running' | 'failed' | 'completed' | 'cancelled'
+import React from 'react';
+import { getAdminMetrics, listProfiles, type Profile } from '@/lib/queries';
+
+export type JobStatus = 'queued' | 'running' | 'failed' | 'completed' | 'cancelled';
 
 interface DashboardJob {
-  id: string
-  status: JobStatus
-  nome: string
-  nicho: string
-  categoria: string
-  created_at: string
-  updated_at: string
+  id: string;
+  status: JobStatus;
+  nome: string;
+  nicho: string;
+  categoria: string;
+  created_at: string;
+  updated_at: string;
 }
 
 interface WebhookInfo {
-  id: string
-  name: string
-  url: string
-  enabled: boolean
+  id: string;
+  name: string;
+  url: string;
+  enabled: boolean;
 }
 
 interface DashboardData {
   counters: {
-    perfis_publicados: number
-    perfis_rascunho: number
-    jobs_pendentes: number
-    jobs_falhos: number
-  }
-  recentJobs: DashboardJob[]
-  webhooks: WebhookInfo[]
+    perfis_publicados: number;
+    perfis_rascunho: number;
+    jobs_pendentes: number;
+    jobs_falhos: number;
+  };
+  recentJobs: DashboardJob[];
+  webhooks: WebhookInfo[];
 }
 
 function StatusPill({ s }: { s: JobStatus }) {
@@ -39,44 +42,41 @@ function StatusPill({ s }: { s: JobStatus }) {
     completed: 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30',
     failed: 'bg-rose-500/15 text-rose-300 border border-rose-400/30',
     cancelled: 'bg-slate-500/15 text-slate-300 border border-slate-400/30',
-  }
-  return <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${map[s]}`}>{s}</span>
+  };
+  return <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${map[s]}`}>{s}</span>;
 }
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <div className={`rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 ${className}`}>{children}</div>
+  return <div className={`rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 ${className}`}>{children}</div>;
 }
 
-type StatProps = { label: string | number; value: string | number }
+type StatProps = { label: string | number; value: string | number };
 function Stat({ label, value }: StatProps) {
   return (
     <div className="flex flex-col">
       <span className="text-sm text-white/70">{label}</span>
       <span className="text-3xl font-semibold mt-1">{value}</span>
     </div>
-  )
+  );
 }
 
-/** Converte status (published/draft) em um JobStatus visual do painel */
 function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
   switch ((dbStatus || '').toLowerCase()) {
     case 'published':
     case 'publicado':
-      return 'completed'
+      return 'completed';
     case 'draft':
     case 'rascunho':
-      return 'queued'
+      return 'queued';
     default:
-      return 'queued'
+      return 'queued';
   }
 }
 
 async function fetchData(): Promise<DashboardData> {
-  // Métricas (NocoDB / fallback local via lib/queries)
-  const metrics = await getAdminMetrics()
+  const metrics = await getAdminMetrics();
 
-  // Perfis recentes para preencher a grade “Jobs recentes”
-  const { data: perfis } = await listProfiles({ page: 1, perPage: 12 })
+  const { data: perfis } = await listProfiles({ page: 1, perPage: 12 });
   const recentJobs: DashboardJob[] = (perfis as Profile[]).map((p) => ({
     id: p.id,
     status: statusDbToJobStatus(p.status),
@@ -85,25 +85,22 @@ async function fetchData(): Promise<DashboardData> {
     categoria: p.sector ?? '-',
     created_at: p.created_at,
     updated_at: p.updated_at,
-  }))
+  }));
 
-  // Webhooks do .env
-  const webhooks: WebhookInfo[] = []
-  const whGen = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL || process.env.N8N_LUMINA_CREATE
-  if (whGen) webhooks.push({ id: 'wh1', name: 'n8n-generate', url: whGen, enabled: true })
-  if (process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL) {
-    webhooks.push({
-      id: 'wh2',
-      name: 'n8n-webstories',
-      url: (process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL)!,
-      enabled: true,
-    })
-  }
+  const webhooks: WebhookInfo[] = [];
+  const whGen =
+    process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL ||
+    process.env.N8N_WEBHOOK_URL ||
+    process.env.N8N_LUMINA_CREATE;
+  if (whGen) webhooks.push({ id: 'wh1', name: 'n8n-generate', url: whGen, enabled: true });
 
-  const published = metrics.publishedProfiles ?? 0
-  const total = metrics.totalProfiles ?? 0
-  const drafts = Math.max(0, total - published)
-  const pending = drafts // no teu fluxo, rascunho = pendente
+  const whStories = process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL;
+  if (whStories) webhooks.push({ id: 'wh2', name: 'n8n-webstories', url: whStories, enabled: true });
+
+  const published = metrics.publishedProfiles ?? 0;
+  const total = metrics.totalProfiles ?? 0;
+  const drafts = Math.max(0, total - published);
+  const pending = drafts;
 
   return {
     counters: {
@@ -114,17 +111,26 @@ async function fetchData(): Promise<DashboardData> {
     },
     recentJobs,
     webhooks,
-  }
+  };
 }
 
 export default async function AdminDashboard() {
-  let data: DashboardData | null = null
-  let error: string | null = null
+  // Guard extra: nunca renderizar no client
+  if (typeof window !== 'undefined') {
+    return (
+      <div className="container py-10">
+        <div className="text-rose-300">Este painel só pode rodar no servidor.</div>
+      </div>
+    );
+  }
+
+  let data: DashboardData | null = null;
+  let error: string | null = null;
 
   try {
-    data = await fetchData()
+    data = await fetchData();
   } catch (e: any) {
-    error = e?.message || 'Falha ao carregar'
+    error = e?.message || 'Falha ao carregar';
   }
 
   if (error || !data) {
@@ -132,11 +138,11 @@ export default async function AdminDashboard() {
       <div className="container py-10">
         <div className="text-rose-300">Erro: {error}</div>
         <p className="text-white/60 mt-2 text-sm">
-          Verifique as variáveis de NocoDB no <code>.env</code> (<code>NOCODB_BASE_URL</code>, <code>NOCODB_API_TOKEN</code>,
-          <code>NOCODB_TABLE_ID</code>) ou ative o fallback local em <code>data/profiles.json</code>.
+          Verifique as variáveis de NocoDB no <code>.env</code> (<code>NOCODB_BASE_URL</code>,{' '}
+          <code>NOCODB_API_TOKEN</code>, <code>NOCODB_TABLE_ID</code>).
         </p>
       </div>
-    )
+    );
   }
 
   return (
@@ -230,9 +236,13 @@ export default async function AdminDashboard() {
                     <p className="font-medium">{w.name}</p>
                     <p className="text-xs text-white/60 break-all">{w.url}</p>
                   </div>
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    w.enabled ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30'
-                               : 'bg-slate-500/15 text-slate-300 border border-slate-400/30'}`}>
+                  <span
+                    className={`px-2 py-1 rounded text-xs font-medium ${
+                      w.enabled
+                        ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30'
+                        : 'bg-slate-500/15 text-slate-300 border border-slate-400/30'
+                    }`}
+                  >
                     {w.enabled ? 'ativo' : 'desativado'}
                   </span>
                 </div>
@@ -240,12 +250,15 @@ export default async function AdminDashboard() {
             ))}
             {data.webhooks.length === 0 && (
               <li className="p-3 rounded-xl bg-white/5 border border-white/10 text-white/70 text-sm">
-                Configure <code>NEXT_PUBLIC_N8N_WEBHOOK_URL</code> / <code>N8N_WEBHOOK_URL</code> ou <code>N8N_LUMINA_CREATE</code> no .env.local
+                Configure <code>NEXT_PUBLIC_N8N_WEBHOOK_URL</code> / <code>N8N_WEBHOOK_URL</code> ou{' '}
+                <code>N8N_LUMINA_CREATE</code> no .env.local
               </li>
             )}
           </ul>
           <div className="mt-4">
-            <button className="btn border-white/10 hover:bg-white/10 w-full" disabled>Adicionar webhook</button>
+            <button className="btn border-white/10 hover:bg-white/10 w-full" disabled>
+              Adicionar webhook
+            </button>
           </div>
         </Card>
       </div>
@@ -269,5 +282,5 @@ export default async function AdminDashboard() {
         </Card>
       </div>
     </div>
-  )
+  );
 }
