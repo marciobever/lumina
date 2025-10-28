@@ -1,6 +1,6 @@
 // app/admin/AdminDashboard.tsx
 import React from 'react'
-import { db } from '@/lib/supabaseServer'
+import { listProfiles, getAdminMetrics, type Profile } from '@/lib/queries'
 
 export type JobStatus = 'queued' | 'running' | 'failed' | 'completed' | 'cancelled'
 
@@ -32,6 +32,7 @@ interface DashboardData {
   webhooks: WebhookInfo[]
 }
 
+/* ---------------- UI helpers ---------------- */
 function StatusPill({ s }: { s: JobStatus }) {
   const map: Record<JobStatus, string> = {
     queued: 'bg-amber-500/15 text-amber-400 border border-amber-400/30',
@@ -47,7 +48,6 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
   return <div className={`rounded-2xl border border-white/10 bg-white/5 backdrop-blur-md p-5 ${className}`}>{children}</div>
 }
 
-// ✅ corrigido: tipagem inclui "value"
 type StatProps = { label: string | number; value: string | number }
 function Stat({ label, value }: StatProps) {
   return (
@@ -58,7 +58,6 @@ function Stat({ label, value }: StatProps) {
   )
 }
 
-/** Converte status do banco (pt/en) em JobStatus do painel */
 function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
   switch ((dbStatus || '').toLowerCase()) {
     case 'published':
@@ -72,24 +71,29 @@ function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
   }
 }
 
-async function fetchRealServer(): Promise<DashboardData> {
-  const supa = db() // já aponta para o schema 'lumina'
+function fmtDate(ptIso: string) {
+  try {
+    return new Date(ptIso).toLocaleString('pt-BR')
+  } catch {
+    return ptIso
+  }
+}
 
-  // ✅ alinhado com o projeto: 'published' e 'draft'
-  const [{ count: cPub }, { count: cDraft }] = await Promise.all([
-    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'published'),
-    supa.from('profiles').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
-  ])
+/* ---------------- Data loader (NocoDB-first) ---------------- */
+async function fetchDashboardData(): Promise<DashboardData> {
+  // Métricas agregadas via queries (NocoDB-first)
+  const metrics = await getAdminMetrics()
 
-  const { data: perfis, error } = await supa
-    .from('profiles')
-    .select('id, display_name, title, sector, status, created_at, updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(12)
+  // Últimos perfis para compor “jobs recentes”
+  const { data: lastProfiles } = await listProfiles({ page: 1, perPage: 12, status: 'published' })
+  const { data: lastDrafts }   = await listProfiles({ page: 1, perPage: 12, status: 'draft' })
 
-  if (error) throw error
+  const recentSource: Profile[] = [
+    ...(lastProfiles || []),
+    ...(lastDrafts || []),
+  ].slice(0, 12)
 
-  const recentJobs: DashboardJob[] = (perfis ?? []).map((p: any) => ({
+  const recentJobs: DashboardJob[] = (recentSource ?? []).map((p: any) => ({
     id: p.id,
     status: statusDbToJobStatus(p.status),
     nome: p.display_name ?? '(sem nome)',
@@ -99,24 +103,18 @@ async function fetchRealServer(): Promise<DashboardData> {
     updated_at: p.updated_at,
   }))
 
-  // Webhooks do .env (ajuste nomes conforme você usa no projeto)
+  // Webhooks do .env
   const webhooks: WebhookInfo[] = []
   const whGen = process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL || process.env.N8N_WEBHOOK_URL || process.env.N8N_LUMINA_CREATE
   if (whGen) webhooks.push({ id: 'wh1', name: 'n8n-generate', url: whGen, enabled: true })
-  if (process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL) {
-    webhooks.push({
-      id: 'wh2',
-      name: 'n8n-webstories',
-      url: (process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL)!,
-      enabled: true
-    })
-  }
+  const whStories = process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL
+  if (whStories) webhooks.push({ id: 'wh2', name: 'n8n-webstories', url: whStories, enabled: true })
 
   return {
     counters: {
-      perfis_publicados: cPub ?? 0,
-      perfis_rascunho: cDraft ?? 0,
-      jobs_pendentes: cDraft ?? 0, // rascunhos = pendentes para o seu fluxo
+      perfis_publicados: metrics.publishedProfiles ?? 0,
+      perfis_rascunho: metrics.totalProfiles - metrics.publishedProfiles ?? 0,
+      jobs_pendentes: metrics.totalProfiles - metrics.publishedProfiles ?? 0,
       jobs_falhos: 0,
     },
     recentJobs,
@@ -124,12 +122,13 @@ async function fetchRealServer(): Promise<DashboardData> {
   }
 }
 
+/* ---------------- Page ---------------- */
 export default async function AdminDashboard() {
   let data: DashboardData | null = null
   let error: string | null = null
 
   try {
-    data = await fetchRealServer()
+    data = await fetchDashboardData()
   } catch (e: any) {
     error = e?.message || 'Falha ao carregar'
   }
@@ -139,7 +138,8 @@ export default async function AdminDashboard() {
       <div className="container py-10">
         <div className="text-rose-300">Erro: {error}</div>
         <p className="text-white/60 mt-2 text-sm">
-          Verifique se <code>supabaseServer</code> usa o schema <code>lumina</code> e se há permissão de SELECT em <code>profiles</code>.
+          Verifique as variáveis do NocoDB (<code>NOCODB_BASE_URL</code>, <code>NOCODB_TABLE_ID</code>, <code>NOCODB_API_TOKEN</code>).
+          Caso queira usar Supabase como fallback, então configure <code>SUPABASE_URL</code>/<code>SUPABASE_SERVICE_ROLE_KEY</code>.
         </p>
       </div>
     )
@@ -196,9 +196,7 @@ export default async function AdminDashboard() {
                     <td className="py-3 pr-4 font-medium">{j.nome}</td>
                     <td className="py-3 pr-4 text-white/80">{j.nicho}</td>
                     <td className="py-3 pr-4"><StatusPill s={j.status} /></td>
-                    <td className="py-3 pr-4 text-white/60">
-                      {new Date(j.updated_at).toLocaleString('pt-BR')}
-                    </td>
+                    <td className="py-3 pr-4 text-white/60">{fmtDate(j.updated_at)}</td>
                     <td className="py-3">
                       <div className="flex gap-2">
                         <button className="btn border-white/10 hover:bg-white/10">Ver</button>
