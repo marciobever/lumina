@@ -39,14 +39,18 @@ async function nc(path: string, init?: RequestInit) {
 
 export async function POST(req: NextRequest) {
   try {
+    const { pathname } = new URL(req.url);
+    // Deriva a ação do caminho: suporta .../start e .../create
+    const action = pathname.includes('/create') ? 'create' : 'start';
+
     const body = await req.json().catch(() => ({}));
 
     const name      = String(body?.name ?? '').trim();
     const ethnicity = String(body?.ethnicity ?? '').trim();
     const skin_tone = String(body?.skin_tone ?? '').trim();
-    const age       = body?.age ?? ''; // pode ser número ou string
+    const age       = body?.age ?? ''; // número ou string
     const style     = String(body?.style ?? 'editorial').trim();
-    const nicho     = body?.nicho ? String(body.nicho).trim() : ''; // vai pro N8N
+    const nicho     = body?.nicho ? String(body.nicho).trim() : '';
 
     if (!name) {
       return NextResponse.json({ ok:false, error: 'Campo "name" é obrigatório.' }, { status: 400 });
@@ -54,11 +58,8 @@ export async function POST(req: NextRequest) {
 
     const slug = slugify(name);
 
-    // 1) Cria o registro no NocoDB em status "queued"
+    // 1) Cria no NocoDB em "queued" (apenas colunas seguras)
     const tableId = requireEnv('NOCODB_TABLE_ID');
-
-    // IMPORTANTE: para evitar 422, só envie colunas que sabemos existir (vimos no seu dump):
-    // status, name, slug, skin_tone, ethnicity, age, style
     const payload: Record<string, any> = {
       status: 'queued',
       name,
@@ -84,17 +85,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2) Dispara o N8N com o que importa para a geração (inclui "nicho")
+    // 2) Dispara o N8N
     const n8nUrl =
       process.env.N8N_START_WEBHOOK ||
       process.env.NEXT_PUBLIC_N8N_START_WEBHOOK;
 
     if (!n8nUrl) {
-      // ainda assim retornamos sucesso da criação no NocoDB
       return NextResponse.json({
         ok: true,
         Id: recordId,
         slug,
+        action,
         warn: 'N8N_START_WEBHOOK not set — registro criado no NocoDB, mas N8N não foi disparado.'
       });
     }
@@ -106,6 +107,7 @@ export async function POST(req: NextRequest) {
 
     const n8nPayload = {
       source: 'lumina.admin.create',
+      action,            // ← ‘create’ ou ‘start’, conforme URL
       record_id: recordId,
       name,
       slug,
@@ -113,8 +115,7 @@ export async function POST(req: NextRequest) {
       skin_tone,
       age,
       style,
-      nicho,              // ← pedido: incluir no payload do N8N
-      // espaço pra evoluir: persona, locale, seed, etc.
+      nicho,            // ← incluído para a “segunda perna” (conteúdo)
     };
 
     const n8nRes = await fetch(n8nUrl, {
@@ -125,16 +126,17 @@ export async function POST(req: NextRequest) {
     });
 
     if (!n8nRes.ok) {
-      const errText = await n8nRes.text().catch(()=>'');
+      const errText = await n8nRes.text().catch(()=> '');
       return NextResponse.json({
         ok: true,
         Id: recordId,
         slug,
-        warn: `N8N retornou ${n8nRes.status}: ${errText || n8nRes.statusText}`
+        action,
+        warn: `N8N ${n8nRes.status}: ${errText || n8nRes.statusText}`
       });
     }
 
-    return NextResponse.json({ ok: true, Id: recordId, slug }, { status: 200 });
+    return NextResponse.json({ ok: true, Id: recordId, slug, action }, { status: 200 });
   } catch (err: any) {
     return NextResponse.json(
       { ok:false, error: String(err?.message || err) },
