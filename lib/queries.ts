@@ -17,10 +17,6 @@ export type Profile = {
   gallery_urls: string[] | null
   tags: string[] | null
   status: string
-  exibir_anuncios: boolean | null
-  ad_slot_topo: string | null
-  ad_slot_meio: string | null
-  ad_slot_rodape: string | null
   article: any | null
   quiz: any | null
   seo: any | null
@@ -108,10 +104,6 @@ function mapRowToProfile(row: AnyObj): Profile {
     gallery_urls: parseMaybeJsonArray(row.gallery_urls),
     tags: parseMaybeJsonArray(row.tags),
     status: String(row.status ?? "draft"),
-    exibir_anuncios: row.exibir_anuncios == null ? null : !!row.exibir_anuncios,
-    ad_slot_topo: row.ad_slot_topo ?? null,
-    ad_slot_meio: row.ad_slot_meio ?? null,
-    ad_slot_rodape: row.ad_slot_rodape ?? null,
     article: row.article ?? null,
     quiz: row.quiz ?? null,
     seo: row.seo ?? null,
@@ -167,7 +159,6 @@ export type ListParams = {
   perPage?: number
   q?: string
   sector?: string
-  adsOnly?: boolean
   status?: "draft" | "published" | string
 }
 
@@ -183,7 +174,6 @@ export async function listProfiles(params: ListParams = {}) {
     wh.push(encodeURIComponent(`(display_name,like,%25${k}%25)`))
   }
   if (params.sector) wh.push(encodeURIComponent(`(sector,eq,${params.sector})`))
-  if (params.adsOnly) wh.push(encodeURIComponent(`(exibir_anuncios,eq,true)`))
   if (params.status) wh.push(encodeURIComponent(`(status,eq,${params.status})`))
 
   const qs = `${wh.length ? `where=${wh.join("&where=")}&` : ""}limit=${perPage}&offset=${offset}&sort=-UpdatedAt`
@@ -205,7 +195,7 @@ export async function listProfiles(params: ListParams = {}) {
 export async function listFeatured(limit = 12) {
   const lim = Math.max(1, Math.min(50, limit))
   const t = tableId()
-  // ⚠️ Somente exige cover_url preenchida (status livre: done, cover_done, published, etc.)
+  // Exige apenas cover_url preenchida
   const wCover = encodeURIComponent(`(cover_url,neq,)`)
   const url = `/api/v2/tables/${t}/records?where=${wCover}&limit=${lim}&sort=-UpdatedAt`
   const json = await nc(url)
@@ -226,7 +216,6 @@ export async function createProfile(input: Partial<Profile>): Promise<Profile> {
     display_name,
     slug,
     status: input.status ?? "draft",
-    exibir_anuncios: !!input.exibir_anuncios,
     created_at: input.created_at || ts,
     updated_at: ts,
   }
@@ -239,17 +228,6 @@ export async function createProfile(input: Partial<Profile>): Promise<Profile> {
   return mapRowToProfile(row)
 }
 
-export async function toggleAds(id: string, enabled: boolean): Promise<{ ok: true; profile?: Profile }> {
-  const t = tableId()
-  const ts = nowIso()
-  const updated = await nc(`/api/v2/tables/${t}/records/${id}`, {
-    method: "PATCH",
-    body: JSON.stringify({ exibir_anuncios: !!enabled, updated_at: ts }),
-  })
-  const row = (updated?.list?.[0] || updated) as AnyObj
-  return { ok: true, profile: mapRowToProfile(row) }
-}
-
 export async function deleteProfile(id: string) {
   const t = tableId()
   await nc(`/api/v2/tables/${t}/records/${id}`, { method: "DELETE" })
@@ -260,8 +238,6 @@ export async function deleteProfile(id: string) {
 export type AdminMetrics = {
   totalProfiles: number
   publishedProfiles: number
-  profilesWithAds: number
-  profilesWithoutAds: number
 }
 
 export async function getAdminMetrics(): Promise<AdminMetrics> {
@@ -273,16 +249,7 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
   const pubJson = await nc(`/api/v2/tables/${t}/records?where=${wPub}&limit=1`)
   const published = Number(pubJson?.pageInfo?.totalRows || 0)
 
-  const wAds = encodeURIComponent(`(exibir_anuncios,eq,true)`)
-  const adsJson = await nc(`/api/v2/tables/${t}/records?where=${wAds}&limit=1`)
-  const withAds = Number(adsJson?.pageInfo?.totalRows || 0)
-
-  return {
-    totalProfiles: total,
-    publishedProfiles: published,
-    profilesWithAds: withAds,
-    profilesWithoutAds: Math.max(0, total - withAds),
-  }
+  return { totalProfiles: total, publishedProfiles: published }
 }
 
 export async function getDashboardStats(): Promise<{ cards: Array<{ label: string; value: number }> }> {
@@ -291,7 +258,6 @@ export async function getDashboardStats(): Promise<{ cards: Array<{ label: strin
     cards: [
       { label: "Perfis", value: m.totalProfiles },
       { label: "Publicados", value: m.publishedProfiles },
-      { label: "Com Anúncios", value: m.profilesWithAds },
     ],
   }
 }
