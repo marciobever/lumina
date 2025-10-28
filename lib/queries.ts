@@ -1,5 +1,5 @@
 // lib/queries.ts
-// Fonte: NocoDB. Se envs ausentes, cai no fallback LOCAL (data/profiles.json)
+// Fonte ÚNICA: NocoDB. Se envs ausentes, lança erro.
 
 export type Profile = {
   id: string
@@ -32,29 +32,20 @@ export type Profile = {
 export type Photo = { image_url: string; alt?: string }
 type AnyObj = Record<string, any>
 
-const LOCAL_PATH = "data/profiles.json"
-
 // ---------------- utils ----------------
 const nowIso = () => new Date().toISOString()
-const slugify = (s: string) =>
-  String(s || "")
-    .normalize("NFD")
-    // @ts-ignore
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "")
 
-const cryptoRandomId = () => Math.random().toString(36).slice(2, 10)
+function requireEnv(name: string) {
+  const v = process.env[name]
+  if (!v) throw new Error(`Missing env ${name} (NocoDB-only mode)`)
+  return v
+}
 
-const nocodbEnabled = () =>
-  !!(process.env.NOCODB_BASE_URL && process.env.NOCODB_TABLE_ID && process.env.NOCODB_API_TOKEN)
-
-const tableId = () => process.env.NOCODB_TABLE_ID as string
+const tableId = () => requireEnv("NOCODB_TABLE_ID")
 
 async function nc(path: string, init?: RequestInit) {
-  const base = process.env.NOCODB_BASE_URL!
-  const token = process.env.NOCODB_API_TOKEN!
+  const base = requireEnv("NOCODB_BASE_URL")
+  const token = requireEnv("NOCODB_API_TOKEN")
   const url = `${base}${path}`
   const res = await fetch(url, {
     ...init,
@@ -87,10 +78,20 @@ function parseMaybeJsonArray(v: any): string[] | null {
   return s.split(",").map(t => t.trim()).filter(Boolean)
 }
 
+function slugify(s: string) {
+  return String(s || "")
+    .normalize("NFD")
+    // @ts-ignore
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "")
+}
+
 function mapRowToProfile(row: AnyObj): Profile {
   const ts = nowIso()
   const display = String(row.display_name ?? row.name ?? "(sem nome)")
-  const id = String(row.Id ?? row.id ?? row.uuid ?? row.slug ?? cryptoRandomId())
+  const id = String(row.Id ?? row.id ?? row.uuid ?? row.slug ?? display)
   return {
     id,
     slug: String(row.slug ?? slugify(display)),
@@ -120,100 +121,45 @@ function mapRowToProfile(row: AnyObj): Profile {
   }
 }
 
-// --------------- LOCAL fallback ---------------
-async function readLocal(): Promise<Profile[]> {
-  try {
-    const fs = await import("node:fs/promises")
-    const path = await import("node:path")
-    const file = path.join(process.cwd(), LOCAL_PATH)
-    const raw = await fs.readFile(file, "utf8").catch(() => "[]")
-    const arr = JSON.parse(raw)
-    return Array.isArray(arr) ? (arr as Profile[]) : []
-  } catch { return [] }
-}
-
-async function writeLocal(list: Profile[]): Promise<void> {
-  const fs = await import("node:fs/promises")
-  const path = await import("node:path")
-  const file = path.join(process.cwd(), LOCAL_PATH)
-  const dir = path.dirname(file)
-  await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(file, JSON.stringify(list, null, 2), "utf8")
-}
-
-async function localFindById(id: string): Promise<Profile | null> {
-  const all = await readLocal()
-  return all.find(p => String(p.id) === String(id)) ?? null
-}
-async function localFindBySlug(slug: string): Promise<Profile | null> {
-  const all = await readLocal()
-  return all.find(p => String(p.slug) === String(slug)) ?? null
-}
-
 // --------------- READS ---------------
 export async function getProfileBySlug(slug: string): Promise<Profile | null> {
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const where = encodeURIComponent(`(slug,eq,${slug})`)
-    const json = await nc(`/api/v2/tables/${t}/records?where=${where}&limit=1`)
-    const row = json?.list?.[0]
-    return row ? mapRowToProfile(row) : null
-  }
-  return await localFindBySlug(slug)
+  const t = tableId()
+  const where = encodeURIComponent(`(slug,eq,${slug})`)
+  const json = await nc(`/api/v2/tables/${t}/records?where=${where}&limit=1`)
+  const row = json?.list?.[0]
+  return row ? mapRowToProfile(row) : null
 }
 
 export async function getProfileById(id: string): Promise<Profile | null> {
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const json = await nc(`/api/v2/tables/${t}/records/${id}`)
-    const row = (json?.list?.[0] || json) as AnyObj
-    return row && row.id ? mapRowToProfile(row) : null
-  }
-  return await localFindById(id)
+  const t = tableId()
+  const json = await nc(`/api/v2/tables/${t}/records/${id}`)
+  const row = (json?.list?.[0] || json) as AnyObj
+  return row && (row.id ?? row.Id) ? mapRowToProfile(row) : null
 }
 
 export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
-  if (nocodbEnabled()) {
-    // Sem tabela de fotos separada? Usa as URLs do próprio perfil.
-    const prof = await getProfileById(profileId)
-    if (!prof) return []
-    const name = prof.display_name
-    const urls = prof.gallery_urls || []
-    const base = urls.length ? urls : [prof.cover_url, prof.avatar_url].filter(Boolean) as string[]
-    return base.map((u, i) => ({ image_url: u, alt: `${name} — ${i + 1}` }))
-  }
   const prof = await getProfileById(profileId)
   if (!prof) return []
   const name = prof.display_name
   const urls = prof.gallery_urls || []
   const base = urls.length ? urls : [prof.cover_url, prof.avatar_url].filter(Boolean) as string[]
-  return base.map((u, i) => ({ image_url: u!, alt: `${name} — ${i + 1}` }))
+  return base.map((u, i) => ({ image_url: u, alt: `${name} — ${i + 1}` }))
 }
 
 export async function listSimilarProfiles(profileId: string, tags: string[] = [], limit = 6) {
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const json = await nc(`/api/v2/tables/${t}/records?limit=${limit * 4}&sort=-created_at`)
-    let list: AnyObj[] = (json?.list ?? []).filter(
-      (r: AnyObj) => String(r.id) !== String(profileId) && (r.status ?? "published") === "published"
-    )
-    if (tags?.length) {
-      const set = new Set(tags.map(String))
-      list = list.filter((r) => {
-        const rt = Array.isArray(r.tags) ? r.tags.map(String) : parseMaybeJsonArray(r.tags) || []
-        return rt.some((t: string) => set.has(String(t)))
-      })
-    }
-    return list.slice(0, limit).map(mapRowToProfile)
+  const t = tableId()
+  const json = await nc(`/api/v2/tables/${t}/records?limit=${limit * 4}&sort=-created_at`)
+  let list: AnyObj[] = (json?.list ?? []).filter(
+    (r: AnyObj) => String(r.id ?? r.Id) !== String(profileId) && (r.status ?? "published") === "published"
+  )
+  if (tags?.length) {
+    const set = new Set(tags.map(String))
+    list = list.filter((r) => {
+      const rt = Array.isArray(r.tags) ? r.tags.map(String) : parseMaybeJsonArray(r.tags) || []
+      return rt.some((t: string) => set.has(String(t)))
+    })
   }
-  const all = await readLocal()
-  const me = all.find(p => String(p.id) === String(profileId))
-  const tagSet = new Set((tags && tags.length ? tags : (me?.tags || []))?.map(String))
-  const filtered = all
-    .filter(p => p.id !== profileId && p.status === 'published')
-    .filter(p => tagSet.size === 0 ? true : (p.tags || []).some(t => tagSet.has(String(t))))
-    .slice(0, limit)
-  return filtered
+  return list.slice(0, limit).map(mapRowToProfile)
 }
 
 export type ListParams = {
@@ -230,137 +176,85 @@ export async function listProfiles(params: ListParams = {}) {
   const perPage = Math.min(50, Math.max(1, params.perPage ?? 12))
   const offset = (page - 1) * perPage
 
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const wh: string[] = []
-    if (params.q) {
-      const k = params.q.replace(/%/g, "")
-      wh.push(encodeURIComponent(`(display_name,like,%25${k}%25)`))
-    }
-    if (params.sector) wh.push(encodeURIComponent(`(sector,eq,${params.sector})`))
-    if (params.adsOnly) wh.push(encodeURIComponent(`(exibir_anuncios,eq,true)`))
-    if (params.status) wh.push(encodeURIComponent(`(status,eq,${params.status})`))
-
-    const qs = `${wh.length ? `where=${wh.join("&where=")}&` : ""}limit=${perPage}&offset=${offset}&sort=-updated_at`
-    const json = await nc(`/api/v2/tables/${t}/records?${qs}`)
-    const list: AnyObj[] = json?.list ?? []
-    if (params.q) {
-      const k = params.q.toLowerCase()
-      // refine local (após where like do Noco)
-      list.splice(0, list.length, ...list.filter((r: AnyObj) =>
-        [r.display_name, r.title, r.slug, r.city].some((v) => String(v || "").toLowerCase().includes(k))
-      ))
-    }
-    return {
-      data: list.map(mapRowToProfile) as Profile[],
-      total: Number(json?.pageInfo?.totalRows || list.length),
-      page, perPage
-    }
+  const t = tableId()
+  const wh: string[] = []
+  if (params.q) {
+    const k = params.q.replace(/%/g, "")
+    wh.push(encodeURIComponent(`(display_name,like,%25${k}%25)`))
   }
+  if (params.sector) wh.push(encodeURIComponent(`(sector,eq,${params.sector})`))
+  if (params.adsOnly) wh.push(encodeURIComponent(`(exibir_anuncios,eq,true)`))
+  if (params.status) wh.push(encodeURIComponent(`(status,eq,${params.status})`))
 
-  // local
-  let data = await readLocal()
+  const qs = `${wh.length ? `where=${wh.join("&where=")}&` : ""}limit=${perPage}&offset=${offset}&sort=-updated_at`
+  const json = await nc(`/api/v2/tables/${t}/records?${qs}`)
+  const list: AnyObj[] = json?.list ?? []
   if (params.q) {
     const k = params.q.toLowerCase()
-    data = data.filter((r) =>
-      [r.display_name, r.title, r.slug, r.city]
-        .some((v) => String(v || "").toLowerCase().includes(k))
-    )
+    // filtro extra client-side
+    list.splice(0, list.length, ...list.filter((r: AnyObj) =>
+      [r.display_name, r.title, r.slug, r.city].some((v) => String(v || "").toLowerCase().includes(k))
+    ))
   }
-  if (params.sector) data = data.filter(r => r.sector === params.sector)
-  if (params.adsOnly) data = data.filter(r => !!r.exibir_anuncios)
-  if (params.status) data = data.filter(r => r.status === params.status)
-
-  const total = data.length
-  const slice = data
-    .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
-    .slice(offset, offset + perPage)
-
-  return { data: slice, total, page, perPage }
+  return {
+    data: list.map(mapRowToProfile) as Profile[],
+    total: Number(json?.pageInfo?.totalRows || list.length),
+    page, perPage
+  }
 }
 
 export async function listFeatured(limit = 12) {
   const lim = Math.max(1, Math.min(50, limit))
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const w1 = encodeURIComponent(`(status,in,cover_done|gallery_done|published)`)
-    const w2 = encodeURIComponent(`(cover_url,neq,)`)
-    const url = `/api/v2/tables/${t}/records?where=${w1}&where=${w2}&limit=${lim}&sort=-updated_at`
-    const json = await nc(url)
-    const list: AnyObj[] = json?.list ?? []
-    const data = list.map(mapRowToProfile)
-    return { data, total: Number(json?.pageInfo?.totalRows || data.length) }
-  }
-  const all = await readLocal()
-  const pub = all.filter(p => !!p.cover_url)
-  const slice = pub
-    .sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || ''))
-    .slice(0, lim)
-  return { data: slice, total: slice.length }
+  const t = tableId()
+  // status aceitos e precisa ter cover_url preenchida
+  const w1 = encodeURIComponent(`(status,in,cover_done|gallery_done|published)`)
+  const w2 = encodeURIComponent(`(cover_url,neq,)`)
+  const url = `/api/v2/tables/${t}/records?where=${w1}&where=${w2}&limit=${lim}&sort=-updated_at`
+  const json = await nc(url)
+  const list: AnyObj[] = json?.list ?? []
+  const data = list.map(mapRowToProfile)
+  return { data, total: Number(json?.pageInfo?.totalRows || data.length) }
 }
 
 // --------------- WRITES / MUTATIONS ---------------
 export async function createProfile(input: Partial<Profile>): Promise<Profile> {
-  const payload: AnyObj = { ...input }
-  const display_name = payload.display_name || "Novo Perfil"
-  const slug = payload.slug || slugify(display_name)
+  const t = tableId()
+  const display_name = input.display_name || "Novo Perfil"
+  const slug = input.slug || slugify(display_name)
   const ts = nowIso()
 
-  payload.id              = payload.id || cryptoRandomId()
-  payload.display_name    = display_name
-  payload.slug            = slug
-  payload.status          = (payload.status as any) || "draft"
-  payload.exibir_anuncios = !!payload.exibir_anuncios
-  payload.created_at      = payload.created_at || ts
-  payload.updated_at      = ts
-
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const created = await nc(`/api/v2/tables/${t}/records`, {
-      method: "POST",
-      body: JSON.stringify({ ...payload }),
-    })
-    const row = (created?.list?.[0] || created) as AnyObj
-    return mapRowToProfile(row)
+  const payload: AnyObj = {
+    ...input,
+    display_name,
+    slug,
+    status: input.status ?? "draft",
+    exibir_anuncios: !!input.exibir_anuncios,
+    created_at: input.created_at || ts,
+    updated_at: ts,
   }
 
-  const all = await readLocal()
-  const exists = all.some(p => p.slug === slug || p.id === payload.id)
-  if (exists) throw new Error("Já existe um perfil com este slug/id no armazenamento local.")
-  const prof = mapRowToProfile(payload)
-  all.unshift(prof)
-  await writeLocal(all)
-  return prof
+  const created = await nc(`/api/v2/tables/${t}/records`, {
+    method: "POST",
+    body: JSON.stringify({ ...payload }),
+  })
+  const row = (created?.list?.[0] || created) as AnyObj
+  return mapRowToProfile(row)
 }
 
 export async function toggleAds(id: string, enabled: boolean): Promise<{ ok: true; profile?: Profile }> {
+  const t = tableId()
   const ts = nowIso()
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const updated = await nc(`/api/v2/tables/${t}/records/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ exibir_anuncios: !!enabled, updated_at: ts }),
-    })
-    const row = (updated?.list?.[0] || updated) as AnyObj
-    return { ok: true, profile: mapRowToProfile(row) }
-  }
-  const all = await readLocal()
-  const idx = all.findIndex(p => String(p.id) === String(id))
-  if (idx < 0) return { ok: true, profile: undefined }
-  all[idx] = { ...all[idx], exibir_anuncios: !!enabled, updated_at: ts }
-  await writeLocal(all)
-  return { ok: true, profile: all[idx] }
+  const updated = await nc(`/api/v2/tables/${t}/records/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ exibir_anuncios: !!enabled, updated_at: ts }),
+  })
+  const row = (updated?.list?.[0] || updated) as AnyObj
+  return { ok: true, profile: mapRowToProfile(row) }
 }
 
 export async function deleteProfile(id: string) {
-  if (nocodbEnabled()) {
-    const t = tableId()
-    await nc(`/api/v2/tables/${t}/records/${id}`, { method: "DELETE" })
-    return true
-  }
-  const all = await readLocal()
-  const next = all.filter(p => String(p.id) !== String(id))
-  await writeLocal(next)
+  const t = tableId()
+  await nc(`/api/v2/tables/${t}/records/${id}`, { method: "DELETE" })
   return true
 }
 
@@ -373,31 +267,18 @@ export type AdminMetrics = {
 }
 
 export async function getAdminMetrics(): Promise<AdminMetrics> {
-  if (nocodbEnabled()) {
-    const t = tableId()
-    const totalJson = await nc(`/api/v2/tables/${t}/records?limit=1`)
-    const total = Number(totalJson?.pageInfo?.totalRows || 0)
+  const t = tableId()
+  const totalJson = await nc(`/api/v2/tables/${t}/records?limit=1`)
+  const total = Number(totalJson?.pageInfo?.totalRows || 0)
 
-    const wPub = encodeURIComponent(`(status,eq,published)`)
-    const pubJson = await nc(`/api/v2/tables/${t}/records?where=${wPub}&limit=1`)
-    const published = Number(pubJson?.pageInfo?.totalRows || 0)
+  const wPub = encodeURIComponent(`(status,eq,published)`)
+  const pubJson = await nc(`/api/v2/tables/${t}/records?where=${wPub}&limit=1`)
+  const published = Number(pubJson?.pageInfo?.totalRows || 0)
 
-    const wAds = encodeURIComponent(`(exibir_anuncios,eq,true)`)
-    const adsJson = await nc(`/api/v2/tables/${t}/records?where=${wAds}&limit=1`)
-    const withAds = Number(adsJson?.pageInfo?.totalRows || 0)
+  const wAds = encodeURIComponent(`(exibir_anuncios,eq,true)`)
+  const adsJson = await nc(`/api/v2/tables/${t}/records?where=${wAds}&limit=1`)
+  const withAds = Number(adsJson?.pageInfo?.totalRows || 0)
 
-    return {
-      totalProfiles: total,
-      publishedProfiles: published,
-      profilesWithAds: withAds,
-      profilesWithoutAds: Math.max(0, total - withAds),
-    }
-  }
-
-  const all = await readLocal()
-  const total = all.length
-  const published = all.filter(p => p.status === 'published').length
-  const withAds = all.filter(p => !!p.exibir_anuncios).length
   return {
     totalProfiles: total,
     publishedProfiles: published,
