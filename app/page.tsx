@@ -8,28 +8,53 @@ import NeonHero from '@/components/NeonHero'
 import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
 
-type FeaturedItem = {
-  id?: string
+type FeaturedIn = {
   slug: string
-  display_name?: string
-  name?: string
+  display_name?: string | null
+  name?: string | null
   title?: string | null
   sector?: string | null
   cover_url?: string | null
   hero_url?: string | null
   avatar_url?: string | null
-  city?: string | null
-  tags?: string[] | null
+}
+
+type CardOut = {
+  slug: string
+  nome: string
+  titulo?: string | null
+  categoria?: string | null
+  capa_url?: string | null
+}
+
+// Normaliza o item vindo do banco para o formato esperado pelo Card
+function toCard(p: FeaturedIn): CardOut {
+  const capa =
+    p.cover_url ||
+    p.hero_url ||
+    p.avatar_url ||
+    null
+
+  return {
+    slug: String(p.slug),
+    // 🔒 garante string SEMPRE (evita erro de tipo no build)
+    nome: String(p.display_name || p.name || p.slug || 'Perfil'),
+    titulo: p.title ?? null,
+    categoria: p.sector ?? null,
+    capa_url: capa,
+  }
 }
 
 export default async function Page() {
-  let featured: FeaturedItem[] = []
+  let featured: FeaturedIn[] = []
   try {
     const { data } = await listFeatured(12)
-    featured = Array.isArray(data) ? (data as FeaturedItem[]) : []
+    featured = Array.isArray(data) ? data : []
   } catch {
     featured = []
   }
+
+  const cards: CardOut[] = featured.map(toCard)
 
   return (
     <div className="relative bg-[#050010] text-white">
@@ -66,12 +91,13 @@ export default async function Page() {
             </button>
           </form>
 
-          {/* SLOT DE PUBLICIDADE */}
+          {/* SLOT DE PUBLICIDADE (GAM — visual “bonitinho”) */}
           <div className="w-full flex justify-center mt-8">
             <div className="w-full max-w-[336px] flex flex-col items-center">
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
                 Publicidade
               </div>
+
               <div
                 id="Content1"
                 className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
@@ -82,17 +108,17 @@ export default async function Page() {
             </div>
           </div>
 
-          {/* Dica de rolagem */}
+          {/* Dica de rolagem + respiro para empurrar a próxima seção abaixo da dobra */}
           <div className="text-center text-white/70 mt-6">
             ↓ role para ver os destaques
           </div>
 
-          {/* Espaço para não vazar a próxima seção */}
+          {/* Espaço de segurança para não vazar o título da próxima seção */}
           <div className="h-16 sm:h-20 md:h-24" />
         </div>
       </section>
 
-      {/* DESTAQUES */}
+      {/* DESTAQUES – começa abaixo da dobra sem “vazar” */}
       <section
         id="destaques"
         className="relative section scroll-mt-24 bg-gradient-to-b from-transparent via-[#08001A]/80 to-[#050010]"
@@ -105,36 +131,13 @@ export default async function Page() {
             </a>
           </div>
 
-          {featured.length === 0 ? (
-            <div className="rounded-lg border border-white/10 bg-white/5 p-6 text-white/70">
-              Sem destaques por enquanto. Assim que os perfis forem publicados com
-              <span className="mx-1 font-semibold text-white">cover_url</span>
-              a gente mostra aqui.
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-              {featured.map((p) => {
-                // prioriza cover, depois hero e avatar
-                const capa =
-                  p.cover_url || p.hero_url || p.avatar_url || null
-
-                return (
-                  <div key={p.slug} className="aspect-[3/4]">
-                    <ProfileCard
-                      p={{
-                        ...p,
-                        // normalizações esperadas pelo card
-                        nome: p.display_name ?? p.name,
-                        titulo: p.title ?? undefined,
-                        categoria: p.sector ?? undefined,
-                        capa_url: capa, // <- PRIORIDADE: cover_url
-                      }}
-                    />
-                  </div>
-                )
-              })}
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {cards.map((p) => (
+              <div key={p.slug} className="aspect-[3/4]">
+                <ProfileCard p={p} />
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
