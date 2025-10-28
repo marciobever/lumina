@@ -17,7 +17,7 @@ type Props = {
     q?: string
     sector?: string
     status?: 'draft' | 'published'
-    adsOnly?: 'true' | 'false'
+    // adsOnly?: 'true' | 'false' // REMOVIDO
   }
 }
 
@@ -49,11 +49,11 @@ export default async function PerfisPage({ searchParams }: Props) {
   const PER_PAGE_WITHOUT_AD = 11
   const REQUEST_SIZE = PER_PAGE_WITHOUT_AD + 1 // pedimos 12 p/ olhar próxima página
 
-  // filtros opcionais vindos da URL (a busca/filters UI foi removida, mas querystrings seguem funcionando)
+  // filtros opcionais vindos da URL
   const q = searchParams?.q?.trim() || undefined
   const sector = searchParams?.sector?.trim() || undefined
   const status = (searchParams?.status as 'draft' | 'published' | undefined) || 'published'
-  const adsOnly = searchParams?.adsOnly === 'true' ? true : undefined
+  // const adsOnly = searchParams?.adsOnly === 'true' ? true : undefined // REMOVIDO
 
   const { data, total, perPage } = await listProfiles({
     page,
@@ -61,7 +61,7 @@ export default async function PerfisPage({ searchParams }: Props) {
     q,
     sector,
     status,
-    adsOnly,
+    // adsOnly, // REMOVIDO
   })
 
   // Só 11 perfis na grade; o 12º é lookahead
