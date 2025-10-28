@@ -1,10 +1,8 @@
 // lib/queries.ts
-import { db, SUPABASE_READY } from "./supabaseServer"
+// MODO: NocoDB (se envs presentes) OU fallback local (data/profiles.json)
 
-// atenção: o client já aponta para o schema "lumina".
-// portanto, NÃO prefixe com "lumina." aqui.
-const PROFILES_TABLE = "profiles"
-const PHOTOS_TABLE   = "profile_photos"
+const PROFILES_TABLE = "profiles";
+const PHOTOS_TABLE   = "profile_photos"; // usado só se você tiver tabela de fotos no NocoDB
 
 // ==============================
 // Tipagens
@@ -43,14 +41,6 @@ type AnyObj = Record<string, any>
 // ==============================
 // Helpers
 // ==============================
-function parsePgTextArray(v: unknown): string[] {
-  if (Array.isArray(v)) return v.map(String)
-  if (typeof v === "string" && v.startsWith("{") && v.endsWith("}")) {
-    return v.slice(1, -1).split(",").map((s) => s.trim().replace(/^"(.*)"$/, "$1"))
-  }
-  return []
-}
-
 function nowIso() {
   return new Date().toISOString()
 }
@@ -59,6 +49,9 @@ function slugify(s: string) {
     .normalize("NFD").replace(/\p{Diacritic}/gu, "")
     .toLowerCase().replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "")
+}
+function cryptoRandomId() {
+  return Math.random().toString(36).slice(2, 10)
 }
 
 function nocodbEnabled() {
@@ -127,12 +120,49 @@ function mapRowToProfile(row: AnyObj): Profile {
     hero_photo_id: row.hero_photo_id ?? null,
   }
 }
-function cryptoRandomId() {
-  return Math.random().toString(36).slice(2, 10)
+
+// ==============================
+// Fallback LOCAL (data/profiles.json)
+// ==============================
+const LOCAL_PATH = "data/profiles.json";
+
+async function readLocal(): Promise<Profile[]> {
+  try {
+    const fs = await import('node:fs/promises');
+    const path = await import('node:path');
+    const file = path.join(process.cwd(), LOCAL_PATH);
+    const raw = await fs.readFile(file, 'utf8').catch(() => '[]');
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr as Profile[] : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeLocal(list: Profile[]): Promise<void> {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const file = path.join(process.cwd(), LOCAL_PATH);
+  const dir = path.dirname(file);
+  try {
+    await fs.mkdir(dir, { recursive: true });
+    await fs.writeFile(file, JSON.stringify(list, null, 2), 'utf8');
+  } catch (e: any) {
+    throw new Error(`Falha ao salvar ${LOCAL_PATH} (filesystem possivelmente read-only): ${e?.message || e}`);
+  }
+}
+
+async function localFindById(id: string): Promise<Profile | null> {
+  const all = await readLocal();
+  return all.find(p => String(p.id) === String(id)) ?? null;
+}
+async function localFindBySlug(slug: string): Promise<Profile | null> {
+  const all = await readLocal();
+  return all.find(p => String(p.slug) === String(slug)) ?? null;
 }
 
 // ==============================
-// Reads (NocoDB-first; Supabase fallback)
+// Reads
 // ==============================
 export async function getProfileBySlug(slug: string): Promise<Profile | null> {
   if (nocodbEnabled()) {
@@ -142,17 +172,17 @@ export async function getProfileBySlug(slug: string): Promise<Profile | null> {
     const row = json?.list?.[0] || null
     return row ? mapRowToProfile(row) : null
   }
+  return await localFindBySlug(slug);
+}
 
-  if (!SUPABASE_READY) return null
-  const supa = db()!
-  const { data, error } = await supa
-    .from(PROFILES_TABLE)
-    .select("*")
-    .eq("slug", slug)
-    .limit(1)
-    .maybeSingle()
-  if (error) throw error
-  return (data as Profile) ?? null
+export async function getProfileById(id: string): Promise<Profile | null> {
+  if (nocodbEnabled()) {
+    const table = nocodbTableProfiles()
+    const json = await nocodbFetch(`/api/v2/tables/${table}/records/${id}`)
+    const row = (json?.list?.[0] || json) as AnyObj
+    return row && row.id ? mapRowToProfile(row) : null
+  }
+  return await localFindById(id);
 }
 
 export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
@@ -170,7 +200,7 @@ export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
         .filter((p) => p.image_url && /^https?:\/\//i.test(p.image_url))
       if (normalized.length) return normalized
     }
-    // fallback para pegar do próprio perfil
+    // fallback: tirar do próprio perfil
     const prof = await getProfileById(profileId)
     if (!prof) return []
     const name = prof.display_name
@@ -179,73 +209,19 @@ export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
     return base.map((u, i) => ({ image_url: u, alt: `${name} — ${i + 1}` }))
   }
 
-  if (!SUPABASE_READY) return []
-  const supa = db()!
-
-  const { data: photos, error: photosErr } = await supa
-    .from(PHOTOS_TABLE)
-    .select("image_url, alt, position, created_at")
-    .eq("profile_id", profileId)
-    .order("position", { ascending: true, nullsFirst: true })
-    .order("created_at", { ascending: true, nullsFirst: true })
-  if (photosErr) throw photosErr
-
-  const normalized =
-    (photos ?? [])
-      .map((p: any, i: number) => ({
-        image_url: String(p.image_url),
-        alt: p.alt ?? `Foto ${i + 1}`,
-      }))
-      .filter((p) => typeof p.image_url === "string" && /^https?:\/\//i.test(p.image_url))
-
-  if (normalized.length) return normalized
-
-  const { data: prof, error } = await supa
-    .from(PROFILES_TABLE)
-    .select("display_name, cover_url, avatar_url, gallery_urls")
-    .eq("id", profileId)
-    .maybeSingle()
-  if (error) throw error
+  // local
+  const prof = await getProfileById(profileId)
   if (!prof) return []
-
-  const name = (prof as any).display_name as string
-  const urls = parsePgTextArray((prof as any).gallery_urls)
-  const base: string[] = urls.length ? urls : [prof.cover_url, prof.avatar_url].filter(Boolean) as string[]
-
-  return base.map((u, i) => ({ image_url: u, alt: `${name} — ${i + 1}` }))
+  const name = prof.display_name
+  const urls = prof.gallery_urls || []
+  const base = urls.length ? urls : [prof.cover_url, prof.avatar_url].filter(Boolean) as string[]
+  return base.map((u, i) => ({ image_url: u!, alt: `${name} — ${i + 1}` }))
 }
 
 export async function getProfileQuiz(profileId: string) {
-  if (nocodbEnabled()) {
-    const prof = await getProfileById(profileId)
-    const q = (prof as any)?.quiz
-    if (!q) return null
-    if (Array.isArray(q)) {
-      return { title: "Quiz", questions: q.map((s: string) => ({ q: String(s) })) }
-    }
-    if (q?.questions && Array.isArray(q.questions)) {
-      return {
-        title: q.title ?? "Quiz",
-        description: q.description ?? "",
-        questions: q.questions.map((x: any) =>
-          typeof x === "string" ? { q: x } : { q: x.q ?? String(x), options: x.options ?? undefined }
-        ),
-      }
-    }
-    return null
-  }
-
-  if (!SUPABASE_READY) return null
-  const supa = db()!
-  const { data, error } = await supa
-    .from(PROFILES_TABLE)
-    .select("quiz")
-    .eq("id", profileId)
-    .maybeSingle()
-  if (error) throw error
-  const q = (data as any)?.quiz
+  const prof = await getProfileById(profileId)
+  const q = (prof as any)?.quiz
   if (!q) return null
-
   if (Array.isArray(q)) {
     return { title: "Quiz", questions: q.map((s: string) => ({ q: String(s) })) }
   }
@@ -276,31 +252,15 @@ export async function listSimilarProfiles(profileId: string, tags: string[] = []
     return list.slice(0, limit).map(mapRowToProfile)
   }
 
-  if (!SUPABASE_READY) return []
-  const supa = db()!
-
-  if (!tags?.length) {
-    const { data, error } = await supa
-      .from(PROFILES_TABLE)
-      .select("id, slug, display_name, title, sector, cover_url, avatar_url, hero_url, tags")
-      .neq("id", profileId)
-      .eq("status", "published")
-      .order("created_at", { ascending: false })
-      .limit(limit)
-    if (error) throw error
-    return data ?? []
-  }
-
-  const { data, error } = await supa
-    .from(PROFILES_TABLE)
-    .select("id, slug, display_name, title, sector, cover_url, avatar_url, hero_url, tags")
-    .neq("id", profileId)
-    .eq("status", "published")
-    .overlaps("tags", tags)
-    .order("created_at", { ascending: false })
-    .limit(limit)
-  if (error) throw error
-  return data ?? []
+  // local
+  const all = await readLocal();
+  const me = all.find(p => String(p.id) === String(profileId));
+  const tagSet = new Set((tags && tags.length ? tags : (me?.tags || []))?.map(String));
+  const filtered = all
+    .filter(p => p.id !== profileId && p.status === 'published')
+    .filter(p => tagSet.size === 0 ? true : (p.tags || []).some(t => tagSet.has(String(t))))
+    .slice(0, limit);
+  return filtered;
 }
 
 export type ListParams = {
@@ -346,40 +306,26 @@ export async function listProfiles(params: ListParams = {}) {
     return { data: data.map(mapRowToProfile) as Profile[], total: total || data.length, page, perPage }
   }
 
-  if (!SUPABASE_READY) {
-    return { data: [], total: 0, page, perPage }
-  }
-
-  // Supabase fallback
-  const supa = db()!
-  const from = offset
-  const to = from + perPage - 1
-
-  let q = supa
-    .from(PROFILES_TABLE)
-    .select(
-      `
-      id, slug, display_name, title, sector, city, bio,
-      cover_url, gallery_urls, tags, status,
-      exibir_anuncios, ad_slot_topo, ad_slot_meio, ad_slot_rodape,
-      created_at, updated_at
-    `,
-      { count: "exact" }
-    )
-    .order("created_at", { ascending: false })
-    .range(from, to)
+  // local
+  let data = await readLocal();
 
   if (params.q) {
-    const k = params.q.replace(/%/g, "")
-    q = q.or(`display_name.ilike.%${k}%,title.ilike.%${k}%,slug.ilike.%${k}%,city.ilike.%${k}%`)
+    const k = params.q.toLowerCase();
+    data = data.filter((r) =>
+      [r.display_name, r.title, r.slug, r.city]
+        .some((v) => String(v || "").toLowerCase().includes(k))
+    );
   }
-  if (params.sector) q = q.eq("sector", params.sector)
-  if (params.adsOnly) q = q.eq("exibir_anuncios", true)
-  if (params.status) q = q.eq("status", params.status)
+  if (params.sector) data = data.filter(r => r.sector === params.sector);
+  if (params.adsOnly) data = data.filter(r => !!r.exibir_anuncios);
+  if (params.status) data = data.filter(r => r.status === params.status);
 
-  const { data, error, count } = await q
-  if (error) throw error
-  return { data: (data ?? []) as Profile[], total: count ?? 0, page, perPage }
+  const total = data.length;
+  const slice = data
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    .slice(offset, offset + perPage);
+
+  return { data: slice, total, page, perPage };
 }
 
 export async function listFeatured(limit = 12) {
@@ -392,23 +338,16 @@ export async function listFeatured(limit = 12) {
     return { data: slice.map(mapRowToProfile), total: slice.length }
   }
 
-  if (!SUPABASE_READY) {
-    return { data: [], total: 0 }
-  }
-
-  const supa = db()!
-  const { data, error } = await supa
-    .from(PROFILES_TABLE)
-    .select("id, slug, display_name, title, sector, cover_url, gallery_urls, exibir_anuncios, created_at")
-    .eq("status", "published")
-    .order("created_at", { ascending: false })
-    .limit(Math.max(1, Math.min(50, limit)))
-  if (error) throw error
-  return { data: data ?? [], total: data?.length ?? 0 }
+  const all = await readLocal();
+  const pub = all.filter(p => p.status === 'published')
+  const slice = pub
+    .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+    .slice(0, Math.max(1, Math.min(50, limit)));
+  return { data: slice, total: slice.length };
 }
 
 // ==============================
-// Writes / Mutations (NocoDB-first; Supabase fallback)
+// Writes / Mutations
 // ==============================
 export async function createProfile(input: Partial<Profile>): Promise<Profile> {
   const payload: AnyObj = { ...input }
@@ -417,12 +356,13 @@ export async function createProfile(input: Partial<Profile>): Promise<Profile> {
   const slug = payload.slug || slugify(display_name)
   const ts = nowIso()
 
-  payload.display_name   = display_name
-  payload.slug           = slug
-  payload.status         = (payload.status as any) || "draft"
+  payload.id              = payload.id || cryptoRandomId()
+  payload.display_name    = display_name
+  payload.slug            = slug
+  payload.status          = (payload.status as any) || "draft"
   payload.exibir_anuncios = !!payload.exibir_anuncios
-  payload.created_at     = payload.created_at || ts
-  payload.updated_at     = ts
+  payload.created_at      = payload.created_at || ts
+  payload.updated_at      = ts
 
   if (nocodbEnabled()) {
     const table = nocodbTableProfiles()
@@ -434,18 +374,14 @@ export async function createProfile(input: Partial<Profile>): Promise<Profile> {
     return mapRowToProfile(row)
   }
 
-  if (!SUPABASE_READY) {
-    throw new Error('DB desabilitado: configure NocoDB ou SUPABASE_* para criar perfis.')
-  }
-
-  const supa = db()!
-  const { data, error } = await supa
-    .from(PROFILES_TABLE)
-    .insert([{ ...payload }])
-    .select("*")
-    .maybeSingle()
-  if (error) throw error
-  return data as Profile
+  // local
+  const all = await readLocal();
+  const exists = all.some(p => p.slug === slug || p.id === payload.id);
+  if (exists) throw new Error("Já existe um perfil com este slug/id no armazenamento local.");
+  const prof = mapRowToProfile(payload);
+  all.unshift(prof);
+  await writeLocal(all);
+  return prof;
 }
 
 export async function toggleAds(id: string, enabled: boolean): Promise<{ ok: true; profile?: Profile }> {
@@ -461,19 +397,13 @@ export async function toggleAds(id: string, enabled: boolean): Promise<{ ok: tru
     return { ok: true, profile: mapRowToProfile(row) }
   }
 
-  if (!SUPABASE_READY) {
-    throw new Error('DB desabilitado: configure NocoDB ou SUPABASE_* para alterar anúncios.')
-  }
-
-  const supa = db()!
-  const { data, error } = await supa
-    .from(PROFILES_TABLE)
-    .update({ exibir_anuncios: !!enabled, updated_at: ts })
-    .eq("id", id)
-    .select("*")
-    .maybeSingle()
-  if (error) throw error
-  return { ok: true, profile: data as Profile }
+  // local
+  const all = await readLocal();
+  const idx = all.findIndex(p => String(p.id) === String(id));
+  if (idx < 0) return { ok: true, profile: undefined };
+  all[idx] = { ...all[idx], exibir_anuncios: !!enabled, updated_at: ts };
+  await writeLocal(all);
+  return { ok: true, profile: all[idx] };
 }
 
 export async function deleteProfile(id: string) {
@@ -483,14 +413,11 @@ export async function deleteProfile(id: string) {
     return true
   }
 
-  if (!SUPABASE_READY) {
-    throw new Error('DB desabilitado: configure NocoDB ou SUPABASE_* para excluir perfis.')
-  }
-
-  const supa = db()!
-  const { error } = await supa.from(PROFILES_TABLE).delete().eq("id", id)
-  if (error) throw error
-  return true
+  // local
+  const all = await readLocal();
+  const next = all.filter(p => String(p.id) !== String(id));
+  await writeLocal(next);
+  return true;
 }
 
 // ==============================
@@ -514,7 +441,7 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
     const published = Number(pubJson?.pageInfo?.totalRows || 0)
 
     const wAds = encodeURIComponent(`(exibir_anuncios,eq,true)`)
-    const adsJson = await nocodbFetch(`/api/v2/tables/${table}/records?where=${wAds}&limit=1`)
+    const adsJson = await nocodbFetch(`/api/v2/tables/${wAds ? table : table}/records?where=${wAds}&limit=1`)
     const withAds = Number(adsJson?.pageInfo?.totalRows || 0)
 
     return {
@@ -525,26 +452,16 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
     }
   }
 
-  if (!SUPABASE_READY) {
-    return { totalProfiles: 0, publishedProfiles: 0, profilesWithAds: 0, profilesWithoutAds: 0 }
-  }
-
-  const supa = db()!
-  const [{ count: total = 0, error: e1 }, { count: published = 0, error: e2 }, { count: withAds = 0, error: e3 }] =
-    await Promise.all([
-      supa.from(PROFILES_TABLE).select("*", { count: "exact", head: true }),
-      supa.from(PROFILES_TABLE).select("*", { count: "exact", head: true }).eq("status", "published"),
-      supa.from(PROFILES_TABLE).select("*", { count: "exact", head: true }).eq("exibir_anuncios", true),
-    ])
-  if (e1) throw e1
-  if (e2) throw e2
-  if (e3) throw e3
-
+  // local
+  const all = await readLocal();
+  const total = all.length;
+  const published = all.filter(p => p.status === 'published').length;
+  const withAds = all.filter(p => !!p.exibir_anuncios).length;
   return {
-    totalProfiles: total || 0,
-    publishedProfiles: published || 0,
-    profilesWithAds: withAds || 0,
-    profilesWithoutAds: (total || 0) - (withAds || 0),
+    totalProfiles: total,
+    publishedProfiles: published,
+    profilesWithAds: withAds,
+    profilesWithoutAds: Math.max(0, total - withAds),
   }
 }
 
@@ -557,26 +474,4 @@ export async function getDashboardStats(): Promise<{ cards: Array<{ label: strin
       { label: "Com Anúncios", value: m.profilesWithAds },
     ],
   }
-}
-
-// ==============================
-// Auxiliar (NocoDB/Supa)
-// ==============================
-export async function getProfileById(id: string): Promise<Profile | null> {
-  if (nocodbEnabled()) {
-    const table = nocodbTableProfiles()
-    const json = await nocodbFetch(`/api/v2/tables/${table}/records/${id}`)
-    const row = (json?.list?.[0] || json) as AnyObj
-    return row && row.id ? mapRowToProfile(row) : null
-  }
-
-  if (!SUPABASE_READY) return null
-  const supa = db()!
-  const { data, error } = await supa
-    .from(PROFILES_TABLE)
-    .select("*")
-    .eq("id", id)
-    .maybeSingle()
-  if (error) throw error
-  return (data as Profile) ?? null
 }
