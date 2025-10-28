@@ -60,14 +60,30 @@ function Stat({ label, value }: StatProps) {
   );
 }
 
-// Converte o status bruto do NocoDB para o status do painel
+// Mapeia o status vindo do NocoDB para o status do painel
 function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
-  const s = String(dbStatus || '').toLowerCase();
-  if (s === 'published' || s === 'publicado') return 'completed';
-  if (s === 'processing' || s === 'processando') return 'processing';
-  if (s === 'queued' || s === 'queue' || s === 'rascunho' || s === 'draft') return 'queued';
-  if (s === 'failed' || s === 'erro' || s === 'error') return 'failed';
-  if (s === 'cancelled' || s === 'canceled' || s === 'cancelado') return 'cancelled';
+  const s = String(dbStatus || '').trim().toLowerCase();
+
+  // concluídos / publicados
+  if (['done', 'completed', 'published', 'publicado', 'concluido', 'concluído'].includes(s))
+    return 'completed';
+
+  // em processamento
+  if (['processing', 'processando', 'running', 'executando', 'gerando'].includes(s))
+    return 'processing';
+
+  // pendentes / fila
+  if (['queued', 'queue', 'pending', 'rascunho', 'draft', 'novo'].includes(s))
+    return 'queued';
+
+  // falhou
+  if (['failed', 'erro', 'error', 'fail'].includes(s))
+    return 'failed';
+
+  // cancelado
+  if (['cancelled', 'canceled', 'cancelado'].includes(s))
+    return 'cancelled';
+
   // fallback conservador
   return 'queued';
 }
@@ -82,12 +98,11 @@ async function fetchData(): Promise<DashboardData> {
   // Métricas (publicados / total)
   const metrics = await getAdminMetrics();
 
-  // Perfis mais recentes (já ordenados por UpdatedAt desc dentro de listProfiles)
+  // Perfis mais recentes (ordenados por UpdatedAt desc em listProfiles)
   const { data: perfis } = await listProfiles({ page: 1, perPage: 12 });
 
-  // Mapeia linhas do NocoDB para "jobs" do painel
+  // Converte linhas do NocoDB em "jobs" do painel
   const recentJobs: DashboardJob[] = (perfis as Profile[]).map((p) => {
-    // NocoDB pode ter coluna "nicho" — tentamos ler; se não existir, usamos sector/categoria
     const anyP = p as any;
     const nicho = (anyP.nicho ?? p.sector ?? anyP.category ?? '-') as string;
 
@@ -102,21 +117,16 @@ async function fetchData(): Promise<DashboardData> {
     };
   });
 
-  // Contadores
-  const published = metrics.publishedProfiles ?? 0;
-  const total = metrics.totalProfiles ?? 0;
-  const drafts = Math.max(0, total - published);
-
-  // Jobs pendentes = queued + processing dentre os itens listados
+  // Contadores derivados da lista (para jobs)
   const pending = recentJobs.filter(j => j.status === 'queued' || j.status === 'processing').length;
-  const failed = recentJobs.filter(j => j.status === 'failed').length;
+  const failed  = recentJobs.filter(j => j.status === 'failed').length;
 
-  // Webhooks (somente indicadores visuais)
+  // Webhooks (indicadores visuais)
   const webhooks: WebhookInfo[] = [];
   const whGen =
     process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL ||
     process.env.N8N_WEBHOOK_URL ||
-    process.env.N8N_START_WEBHOOK ||    // nome que você usa no .env
+    process.env.N8N_START_WEBHOOK ||    // nome usado no .env
     process.env.N8N_LUMINA_CREATE;      // compat
   if (whGen) webhooks.push({ id: 'wh1', name: 'n8n-generate', url: whGen, enabled: true });
 
@@ -125,6 +135,11 @@ async function fetchData(): Promise<DashboardData> {
     process.env.N8N_WEBSTORIES_URL ||
     '';
   if (whStories) webhooks.push({ id: 'wh2', name: 'n8n-webstories', url: whStories, enabled: true });
+
+  // Métricas de topo (vindas do lib/queries.ts)
+  const published = metrics.publishedProfiles ?? 0;
+  const total     = metrics.totalProfiles ?? 0;
+  const drafts    = Math.max(0, total - published);
 
   return {
     counters: {
