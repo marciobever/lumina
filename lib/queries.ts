@@ -115,9 +115,8 @@ function mapRowToProfile(row: AnyObj): Profile {
     article: row.article ?? null,
     quiz: row.quiz ?? null,
     seo: row.seo ?? null,
-    // aceita campos do sistema do NocoDB (CreatedAt/UpdatedAt) e mantém compat c/ snake_case
-    created_at: row.created_at ?? row.CreatedAt ?? ts,
-    updated_at: row.updated_at ?? row.UpdatedAt ?? ts,
+    created_at: row.created_at ?? ts,
+    updated_at: row.updated_at ?? ts,
     hero_photo_id: row.hero_photo_id ?? null,
   }
 }
@@ -192,15 +191,9 @@ export async function listProfiles(params: ListParams = {}) {
   const list: AnyObj[] = json?.list ?? []
   if (params.q) {
     const k = params.q.toLowerCase()
-    // filtro extra client-side
-    const refined = list.filter((r: AnyObj) =>
+    list.splice(0, list.length, ...list.filter((r: AnyObj) =>
       [r.display_name, r.title, r.slug, r.city].some((v) => String(v || "").toLowerCase().includes(k))
-    )
-    return {
-      data: refined.map(mapRowToProfile) as Profile[],
-      total: Number(json?.pageInfo?.totalRows || refined.length),
-      page, perPage
-    }
+    ))
   }
   return {
     data: list.map(mapRowToProfile) as Profile[],
@@ -212,10 +205,9 @@ export async function listProfiles(params: ListParams = {}) {
 export async function listFeatured(limit = 12) {
   const lim = Math.max(1, Math.min(50, limit))
   const t = tableId()
-  // status aceitos (inclui "done") + precisa ter cover_url preenchida
-  const wStatus = encodeURIComponent(`(status,in,done|cover_done|gallery_done|published)`)
-  const wCover  = encodeURIComponent(`(cover_url,neq,)`)
-  const url = `/api/v2/tables/${t}/records?where=${wStatus}&where=${wCover}&limit=${lim}&sort=-UpdatedAt`
+  // ⚠️ Somente exige cover_url preenchida (status livre: done, cover_done, published, etc.)
+  const wCover = encodeURIComponent(`(cover_url,neq,)`)
+  const url = `/api/v2/tables/${t}/records?where=${wCover}&limit=${lim}&sort=-UpdatedAt`
   const json = await nc(url)
   const list: AnyObj[] = json?.list ?? []
   const data = list.map(mapRowToProfile)
