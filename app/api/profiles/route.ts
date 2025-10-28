@@ -1,19 +1,19 @@
 // app/api/profiles/route.ts
 import { NextResponse } from 'next/server'
-import { listProfiles } from '@/lib/queries' // <- só GET usa
-// REMOVE: createProfile (POST agora vai para o n8n)
+import { listProfiles } from '@/lib/queries' // GET usa apenas isso
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
-  const page = Number(searchParams.get('page') || '1')
+
+  const page    = Number(searchParams.get('page')    || '1')
   const perPage = Number(searchParams.get('perPage') || '12')
-  const q = searchParams.get('q') || undefined
-  const sector = searchParams.get('sector') || undefined
-  const adsOnly = searchParams.get('adsOnly') === 'true' ? true : undefined
-  const status = (searchParams.get('status') as any) || undefined
+  const q       = searchParams.get('q')      || undefined
+  const sector  = searchParams.get('sector') || undefined
+  const status  = (searchParams.get('status') as string | undefined) || undefined
+  // REMOVIDO: adsOnly
 
   try {
-    const result = await listProfiles({ page, perPage, q, sector, adsOnly, status })
+    const result = await listProfiles({ page, perPage, q, sector, status })
     return NextResponse.json(result)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
@@ -21,6 +21,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  // Encaminha criação para o n8n
   const N8N_URL = process.env.N8N_LUMINA_CREATE || process.env.NEXT_PUBLIC_N8N_LUMINA_CREATE
   const N8N_SECRET = process.env.N8N_WEBHOOK_SECRET
 
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
   try {
     const incoming = await req.json()
 
-    // MODO MINIMAL: se vier só sector/locale, completa com seed + idempotency
+    // modo minimal: só sector/locale -> completa seed + idempotency
     const sector = typeof incoming?.sector === 'string' ? incoming.sector.trim() : ''
     const locale = incoming?.locale === 'pt-PT' ? 'pt-PT' : (incoming?.locale || 'pt-BR')
 
@@ -62,8 +63,6 @@ export async function POST(req: Request) {
     })
 
     const text = await res.text()
-
-    // Repassa status e tenta JSON
     try {
       const json = JSON.parse(text)
       return NextResponse.json(json, { status: res.status })
