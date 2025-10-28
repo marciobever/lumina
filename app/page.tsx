@@ -11,7 +11,8 @@ import NewsletterSection from '@/components/NewsletterSection'
 export default async function Page() {
   let featured: any[] = []
   try {
-    const { data } = await listFeatured(12)
+    // Busca no máximo 3 destaques
+    const { data } = await listFeatured(3)
     featured = Array.isArray(data) ? data : []
   } catch {
     featured = []
