@@ -4,6 +4,7 @@ import FiltersBar from '@/components/FiltersBar'
 import ProfileCard from '@/components/ProfileCard'
 import Pagination from '@/components/Pagination'
 import { listProfiles } from '@/lib/queries'
+import Script from 'next/script'
 
 export const metadata = {
   title: 'Perfis • LUMINA',
@@ -33,7 +34,6 @@ function mapToCardProps(p: any) {
     nome: p?.display_name ?? p?.name ?? p?.slug ?? '—',
     titulo: p?.title ?? '',
     categoria: p?.sector ?? '',
-    // ordem de preferência para a capa
     capa_url:
       (typeof p?.hero_url === 'string' && p.hero_url) ||
       (typeof p?.cover_url === 'string' && p.cover_url) ||
@@ -82,22 +82,68 @@ export default async function PerfisPage({ searchParams }: Props) {
 
   return (
     <div className="relative">
-      {/* TOP: Slot com o MESMO visual da home (retângulo responsivo) */}
+      {/* TOP: Leaderboard wide (728x90 desktop / 320x100 mobile) */}
       <section className="section pt-6">
         <div className="container">
           <div className="w-full flex justify-center">
-            <div className="w-full max-w-[336px] flex flex-col items-center">
-              <div className="ad-label">Publicidade</div>
-              {/* O layout cria/exibe este slot automaticamente
-                 path: /23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Content2 */}
-              <div id="Content2" className="ad-block ad--rect">
-                <span className="loading">Carregando anúncio…</span>
+            <div className="w-full max-w-6xl flex flex-col items-center">
+              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
+                Publicidade
+              </div>
+              {/* id específico para leaderboard */}
+              <div
+                id="LeaderboardTop"
+                className="
+                  w-full rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm
+                  shadow-[0_0_20px_rgba(255,0,255,0.08)]
+                  flex items-center justify-center
+                  h-[68px] xs:h-[90px] sm:h-[100px] md:h-[90px] 
+                "
+                // alturas fixas por breakpoint evitam CLS. Ajuste se quiser outro break.
+              >
+                <span className="text-xs text-white/60">Carregando anúncio…</span>
                 <noscript>Ative o JavaScript para ver o anúncio.</noscript>
               </div>
             </div>
           </div>
         </div>
       </section>
+
+      {/* Script local só para o LeaderboardTop (layout já cuida de Content1..9) */}
+      <Script id="gpt-leaderboardtop" strategy="afterInteractive">
+        {`
+          (function(){
+            window.googletag = window.googletag || { cmd: [] };
+            if (window.__gptLBOnce) return; window.__gptLBOnce = true;
+
+            googletag.cmd.push(function() {
+              try {
+                var lbMapping = googletag.sizeMapping()
+                  .addSize([0,0],     [[320,50],[320,100]])   // mobile
+                  .addSize([728,0],   [[728,90]])             // tablet/desktop
+                  .addSize([1024,0],  [[728,90]])             // wide desktop
+                  .build();
+
+                var el = document.getElementById('LeaderboardTop');
+                if (el) {
+                  var slotLB = googletag.defineSlot(
+                    '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_LeaderboardTop',
+                    [[728,90],[320,100],[320,50]],
+                    'LeaderboardTop'
+                  );
+                  if (slotLB) {
+                    slotLB.defineSizeMapping(lbMapping)
+                         .setCollapseEmptyDiv(true)
+                         .addService(googletag.pubads());
+                  }
+                  googletag.enableServices();
+                  googletag.display('LeaderboardTop');
+                }
+              } catch(e) {}
+            });
+          })();
+        `}
+      </Script>
 
       {/* Título + filtros */}
       <section className="section pt-4">
@@ -112,7 +158,7 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* Grade (sem lateral) com 1 ad misturado aos cards */}
+      {/* Grade sem lateral + 1 ad nativo misturado (retângulo) */}
       <section className="pb-10">
         <div className="container">
           {grid.length > 0 ? (
@@ -120,13 +166,25 @@ export default async function PerfisPage({ searchParams }: Props) {
               {grid.map((item, i) => (
                 <div key={i} className="card-aspect">
                   {item.kind === 'ad' ? (
-                    // Card de anúncio com mesmo tamanho e visual consistente do diretório
+                    // Card de anúncio com o mesmo visual/tamanho do card 3:4
                     <div className="profile-card-business ad-card relative" data-ad-slot="Content3">
-                      <div className="ad-label">Publicidade</div>
-                      {/* Path compatível com WP: Content3, mapeado como retângulo */}
-                      <div id="Content3" className="ad-block ad--rect">
-                        <span className="loading">Carregando anúncio…</span>
-                        <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                      <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1 px-3 pt-3">
+                        Publicidade
+                      </div>
+                      {/* Content3: retângulo; layout.tsx já mapeia 250/300/336 + fluid */}
+                      <div
+                        id="Content3"
+                        className="w-full h-full px-3 pb-3"
+                      >
+                        <div className="
+                          w-full h-full min-h-[280px]
+                          rounded-lg border border-white/10 bg-white/5
+                          flex items-center justify-center backdrop-blur-sm
+                          shadow-[0_0_20px_rgba(255,0,255,0.08)]
+                        ">
+                          <span className="text-xs text-white/60">Carregando anúncio…</span>
+                          <noscript>Ative o JavaScript para ver o anúncio.</noscript>
+                        </div>
                       </div>
                     </div>
                   ) : (
