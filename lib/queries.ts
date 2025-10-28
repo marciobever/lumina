@@ -1,6 +1,5 @@
 // lib/queries.ts
-import { db } from "./supabaseServer"
-import { db, SUPABASE_READY } from './supabaseServer'
+import { db, SUPABASE_READY } from "./supabaseServer"
 
 // atenção: o client já aponta para o schema "lumina".
 // portanto, NÃO prefixe com "lumina." aqui.
@@ -144,7 +143,8 @@ export async function getProfileBySlug(slug: string): Promise<Profile | null> {
     return row ? mapRowToProfile(row) : null
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) return null
+  const supa = db()!
   const { data, error } = await supa
     .from(PROFILES_TABLE)
     .select("*")
@@ -158,7 +158,6 @@ export async function getProfileBySlug(slug: string): Promise<Profile | null> {
 export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
   if (nocodbEnabled()) {
     const tablePhotos = nocodbTablePhotos()
-    // Se não houver tabela de fotos, caímos para campos do perfil
     if (tablePhotos) {
       const q = encodeURIComponent(`(profile_id,eq,${profileId})`)
       const json = await nocodbFetch(`/api/v2/tables/${tablePhotos}/records?where=${q}&sort=position,created_at`)
@@ -171,7 +170,6 @@ export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
         .filter((p) => p.image_url && /^https?:\/\//i.test(p.image_url))
       if (normalized.length) return normalized
     }
-
     // fallback para pegar do próprio perfil
     const prof = await getProfileById(profileId)
     if (!prof) return []
@@ -181,8 +179,8 @@ export async function getProfilePhotos(profileId: string): Promise<Photo[]> {
     return base.map((u, i) => ({ image_url: u, alt: `${name} — ${i + 1}` }))
   }
 
-  // Supabase
-  const supa = db()
+  if (!SUPABASE_READY) return []
+  const supa = db()!
 
   const { data: photos, error: photosErr } = await supa
     .from(PHOTOS_TABLE)
@@ -237,7 +235,8 @@ export async function getProfileQuiz(profileId: string) {
     return null
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) return null
+  const supa = db()!
   const { data, error } = await supa
     .from(PROFILES_TABLE)
     .select("quiz")
@@ -265,7 +264,6 @@ export async function getProfileQuiz(profileId: string) {
 export async function listSimilarProfiles(profileId: string, tags: string[] = [], limit = 6) {
   if (nocodbEnabled()) {
     const table = nocodbTableProfiles()
-    // Pega últimos publicados e filtra no cliente (overlaps de tags)
     const json = await nocodbFetch(`/api/v2/tables/${table}/records?limit=${limit * 4}&sort=-created_at`)
     let list: AnyObj[] = (json?.list ?? []).filter((r: AnyObj) => String(r.id) !== String(profileId) && (r.status ?? "published") === "published")
     if (tags?.length) {
@@ -278,7 +276,8 @@ export async function listSimilarProfiles(profileId: string, tags: string[] = []
     return list.slice(0, limit).map(mapRowToProfile)
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) return []
+  const supa = db()!
 
   if (!tags?.length) {
     const { data, error } = await supa
@@ -323,7 +322,6 @@ export async function listProfiles(params: ListParams = {}) {
     const where: string[] = []
     if (params.q) {
       const k = params.q.replace(/%/g, "")
-      // ilike aproximado: usamos múltiplas condições com OR não suportado fácil no v2, então trazemos mais e filtramos no cliente
       where.push(encodeURIComponent(`(display_name,like,%25${k}%25)`))
     }
     if (params.sector) where.push(encodeURIComponent(`(sector,eq,${params.sector})`))
@@ -334,7 +332,6 @@ export async function listProfiles(params: ListParams = {}) {
     const url = `/api/v2/tables/${table}/records?${whereStr}&limit=${perPage}&offset=${offset}&sort=-created_at`
     const json = await nocodbFetch(url)
     let data: AnyObj[] = json?.list ?? []
-    // filtro extra de q nos campos title/slug/city
     if (params.q) {
       const k = params.q.toLowerCase()
       data = data.filter((r: AnyObj) =>
@@ -349,8 +346,12 @@ export async function listProfiles(params: ListParams = {}) {
     return { data: data.map(mapRowToProfile) as Profile[], total: total || data.length, page, perPage }
   }
 
+  if (!SUPABASE_READY) {
+    return { data: [], total: 0, page, perPage }
+  }
+
   // Supabase fallback
-  const supa = db()
+  const supa = db()!
   const from = offset
   const to = from + perPage - 1
 
@@ -391,7 +392,11 @@ export async function listFeatured(limit = 12) {
     return { data: slice.map(mapRowToProfile), total: slice.length }
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) {
+    return { data: [], total: 0 }
+  }
+
+  const supa = db()!
   const { data, error } = await supa
     .from(PROFILES_TABLE)
     .select("id, slug, display_name, title, sector, cover_url, gallery_urls, exibir_anuncios, created_at")
@@ -429,7 +434,11 @@ export async function createProfile(input: Partial<Profile>): Promise<Profile> {
     return mapRowToProfile(row)
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) {
+    throw new Error('DB desabilitado: configure NocoDB ou SUPABASE_* para criar perfis.')
+  }
+
+  const supa = db()!
   const { data, error } = await supa
     .from(PROFILES_TABLE)
     .insert([{ ...payload }])
@@ -452,7 +461,11 @@ export async function toggleAds(id: string, enabled: boolean): Promise<{ ok: tru
     return { ok: true, profile: mapRowToProfile(row) }
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) {
+    throw new Error('DB desabilitado: configure NocoDB ou SUPABASE_* para alterar anúncios.')
+  }
+
+  const supa = db()!
   const { data, error } = await supa
     .from(PROFILES_TABLE)
     .update({ exibir_anuncios: !!enabled, updated_at: ts })
@@ -466,14 +479,15 @@ export async function toggleAds(id: string, enabled: boolean): Promise<{ ok: tru
 export async function deleteProfile(id: string) {
   if (nocodbEnabled()) {
     const table = nocodbTableProfiles()
-    const res = await nocodbFetch(`/api/v2/tables/${table}/records/${id}`, {
-      method: "DELETE",
-    })
-    // NocoDB retorna vazio/ok; consideramos sucesso
+    await nocodbFetch(`/api/v2/tables/${table}/records/${id}`, { method: "DELETE" })
     return true
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) {
+    throw new Error('DB desabilitado: configure NocoDB ou SUPABASE_* para excluir perfis.')
+  }
+
+  const supa = db()!
   const { error } = await supa.from(PROFILES_TABLE).delete().eq("id", id)
   if (error) throw error
   return true
@@ -492,16 +506,13 @@ export type AdminMetrics = {
 export async function getAdminMetrics(): Promise<AdminMetrics> {
   if (nocodbEnabled()) {
     const table = nocodbTableProfiles()
-    // total
     const totalJson = await nocodbFetch(`/api/v2/tables/${table}/records?limit=1`)
     const total = Number(totalJson?.pageInfo?.totalRows || 0)
 
-    // published
     const wPub = encodeURIComponent(`(status,eq,published)`)
     const pubJson = await nocodbFetch(`/api/v2/tables/${table}/records?where=${wPub}&limit=1`)
     const published = Number(pubJson?.pageInfo?.totalRows || 0)
 
-    // withAds
     const wAds = encodeURIComponent(`(exibir_anuncios,eq,true)`)
     const adsJson = await nocodbFetch(`/api/v2/tables/${table}/records?where=${wAds}&limit=1`)
     const withAds = Number(adsJson?.pageInfo?.totalRows || 0)
@@ -514,7 +525,11 @@ export async function getAdminMetrics(): Promise<AdminMetrics> {
     }
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) {
+    return { totalProfiles: 0, publishedProfiles: 0, profilesWithAds: 0, profilesWithoutAds: 0 }
+  }
+
+  const supa = db()!
   const [{ count: total = 0, error: e1 }, { count: published = 0, error: e2 }, { count: withAds = 0, error: e3 }] =
     await Promise.all([
       supa.from(PROFILES_TABLE).select("*", { count: "exact", head: true }),
@@ -555,7 +570,8 @@ export async function getProfileById(id: string): Promise<Profile | null> {
     return row && row.id ? mapRowToProfile(row) : null
   }
 
-  const supa = db()
+  if (!SUPABASE_READY) return null
+  const supa = db()!
   const { data, error } = await supa
     .from(PROFILES_TABLE)
     .select("*")
