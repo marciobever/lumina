@@ -1,9 +1,9 @@
-// app/api/admin/profiles/route.ts
+// app/api/profiles/route.ts
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic' // força SSR; não tenta SSG no build
 
 import { NextResponse } from 'next/server'
-import { createProfile, listProfiles } from '@/lib/queries'
+import { listProfiles } from '@/lib/queries'
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
@@ -13,21 +13,12 @@ export async function GET(req: Request) {
   const q       = searchParams.get('q')       ?? undefined
   const sector  = searchParams.get('sector')  ?? undefined
   const status  = searchParams.get('status')  ?? undefined
+  // const adsOnly = searchParams.get('adsOnly') === 'true' // ❌ removido
 
   try {
-    const out = await listProfiles({ page, perPage, q, sector, status })
-    return NextResponse.json(out)
+    const result = await listProfiles({ page, perPage, q, sector, status })
+    return NextResponse.json(result)
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    const body = await req.json()
-    const created = await createProfile(body)
-    return NextResponse.json(created, { status: 201 })
-  } catch (e: any) {
-    return NextResponse.json({ error: e.message }, { status: 400 })
   }
 }
