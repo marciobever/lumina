@@ -1,102 +1,144 @@
-// app/api/admin/profiles/start/route.ts
-export const runtime = 'nodejs'
-export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
 
+function requireEnv(name: string) {
+  const v = process.env[name];
+  if (!v) throw new Error(`${name} not set`);
+  return v;
+}
 function slugify(s: string) {
   return String(s)
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)+/g, '')
+    .replace(/(^-|-$)+/g, '');
 }
 
-function pick<T = any>(obj: any, ...keys: string[]): T | undefined {
-  for (const k of keys) {
-    if (obj && typeof obj === 'object' && obj[k] != null) return obj[k]
-  }
-  return undefined
+async function nc(path: string, init?: RequestInit) {
+  const base  = requireEnv('NOCODB_BASE_URL');
+  const token = requireEnv('NOCODB_API_TOKEN');
+  const url   = `${base}${path}`;
+
+  const res = await fetch(url, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      'xc-token': token,
+      'Authorization': `Bearer ${token}`,
+      ...(init?.headers || {}),
+    },
+    cache: 'no-store',
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`NocoDB ${res.status}: ${text || res.statusText}`);
+  try { return JSON.parse(text); } catch { return {}; }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}))
-    const name = String(body?.name ?? '').trim()
-    if (!name) return NextResponse.json({ error: 'Campo "name" é obrigatório.' }, { status: 400 })
+    const body = await req.json().catch(() => ({}));
 
-    const slug = slugify(name)
+    const name      = String(body?.name ?? '').trim();
+    const ethnicity = String(body?.ethnicity ?? '').trim();
+    const skin_tone = String(body?.skin_tone ?? '').trim();
+    const age       = body?.age ?? ''; // pode ser número ou string
+    const style     = String(body?.style ?? 'editorial').trim();
+    const nicho     = body?.nicho ? String(body.nicho).trim() : ''; // vai pro N8N
 
-    const N8N_URL =
-      process.env.N8N_START_WEBHOOK ||
-      process.env.NEXT_PUBLIC_N8N_START_WEBHOOK
-
-    if (!N8N_URL) {
-      return NextResponse.json({ error: 'N8N_START_WEBHOOK not set' }, { status: 500 })
+    if (!name) {
+      return NextResponse.json({ ok:false, error: 'Campo "name" é obrigatório.' }, { status: 400 });
     }
 
-    // payload mínimo pro seu fluxo
-    const payload = {
-      action: 'lumina.profile.start',
+    const slug = slugify(name);
+
+    // 1) Cria o registro no NocoDB em status "queued"
+    const tableId = requireEnv('NOCODB_TABLE_ID');
+
+    // IMPORTANTE: para evitar 422, só envie colunas que sabemos existir (vimos no seu dump):
+    // status, name, slug, skin_tone, ethnicity, age, style
+    const payload: Record<string, any> = {
+      status: 'queued',
       name,
       slug,
-      ethnicity: body?.ethnicity ?? null,
-      skin_tone: body?.skin_tone ?? null,
-      age: body?.age ?? null,
-      style: body?.style ?? 'editorial',
-      source: 'lumina-admin/create',
+      skin_tone: skin_tone || undefined,
+      ethnicity: ethnicity || undefined,
+      age: age ?? undefined,
+      style: style || undefined,
+    };
+
+    const created = await nc(`/api/v2/tables/${tableId}/records`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+
+    const row: any = created?.list?.[0] || created || {};
+    const recordId = String(row?.Id ?? row?.id ?? '');
+
+    if (!recordId) {
+      return NextResponse.json(
+        { ok:false, error:'Registro criado no NocoDB sem Id. Verifique o schema/retorno.' },
+        { status: 500 }
+      );
     }
 
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-    if (process.env.N8N_WEBHOOK_SECRET) headers['x-lumina-secret'] = process.env.N8N_WEBHOOK_SECRET
+    // 2) Dispara o N8N com o que importa para a geração (inclui "nicho")
+    const n8nUrl =
+      process.env.N8N_START_WEBHOOK ||
+      process.env.NEXT_PUBLIC_N8N_START_WEBHOOK;
 
-    const res = await fetch(N8N_URL, {
+    if (!n8nUrl) {
+      // ainda assim retornamos sucesso da criação no NocoDB
+      return NextResponse.json({
+        ok: true,
+        Id: recordId,
+        slug,
+        warn: 'N8N_START_WEBHOOK not set — registro criado no NocoDB, mas N8N não foi disparado.'
+      });
+    }
+
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (process.env.N8N_WEBHOOK_SECRET) {
+      headers['x-lumina-secret'] = process.env.N8N_WEBHOOK_SECRET!;
+    }
+
+    const n8nPayload = {
+      source: 'lumina.admin.create',
+      record_id: recordId,
+      name,
+      slug,
+      ethnicity,
+      skin_tone,
+      age,
+      style,
+      nicho,              // ← pedido: incluir no payload do N8N
+      // espaço pra evoluir: persona, locale, seed, etc.
+    };
+
+    const n8nRes = await fetch(n8nUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(n8nPayload),
       cache: 'no-store',
-    })
+    });
 
-    const text = await res.text()
-
-    // tenta ler JSON do N8N
-    let n8n: any = null
-    try { n8n = JSON.parse(text) } catch { /* deixa como texto cru */ }
-
-    // NORMALIZAÇÃO: tenta achar Id/slug em vários jeitos comuns
-    const flat = (obj: any): any => obj && typeof obj === 'object' ? obj : {}
-    const top = flat(n8n)
-
-    // pode vir direto no topo, ou dentro de {data:{...}}/{result:{...}} etc
-    const candidates = [
-      top,
-      flat(top.data),
-      flat(top.result),
-      Array.isArray(top.list) ? flat(top.list[0]) : undefined,
-    ].filter(Boolean)
-
-    let Id: any, idAny: any, outSlug: any
-    for (const c of candidates) {
-      Id = Id ?? pick(c, 'Id', 'ID')
-      idAny = idAny ?? pick(c, 'id', 'uuid')
-      outSlug = outSlug ?? pick(c, 'slug')
+    if (!n8nRes.ok) {
+      const errText = await n8nRes.text().catch(()=>'');
+      return NextResponse.json({
+        ok: true,
+        Id: recordId,
+        slug,
+        warn: `N8N retornou ${n8nRes.status}: ${errText || n8nRes.statusText}`
+      });
     }
-    // fallbacks
-    const finalId = Id ?? idAny ?? null
-    const finalSlug = String(outSlug ?? slug)
 
-    return NextResponse.json(
-      {
-        ok: res.ok,
-        status: res.status,
-        Id: finalId,            // << o client lê isso
-        slug: finalSlug,        // << e isso
-        n8n_raw: n8n ?? text,   // debug (pode remover depois)
-      },
-      { status: res.ok ? 200 : res.status }
-    )
+    return NextResponse.json({ ok: true, Id: recordId, slug }, { status: 200 });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? 'Erro inesperado' }, { status: 500 })
+    return NextResponse.json(
+      { ok:false, error: String(err?.message || err) },
+      { status: 500 }
+    );
   }
 }
