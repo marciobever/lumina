@@ -5,7 +5,7 @@ export const runtime = 'nodejs';
 import React from 'react';
 import { getAdminMetrics, listProfiles, type Profile } from '@/lib/queries';
 
-export type JobStatus = 'queued' | 'running' | 'failed' | 'completed' | 'cancelled';
+export type JobStatus = 'queued' | 'processing' | 'failed' | 'completed' | 'cancelled';
 
 interface DashboardJob {
   id: string;
@@ -13,8 +13,8 @@ interface DashboardJob {
   nome: string;
   nicho: string;
   categoria: string;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 interface WebhookInfo {
@@ -38,7 +38,7 @@ interface DashboardData {
 function StatusPill({ s }: { s: JobStatus }) {
   const map: Record<JobStatus, string> = {
     queued: 'bg-amber-500/15 text-amber-400 border border-amber-400/30',
-    running: 'bg-indigo-500/15 text-indigo-300 border border-indigo-400/30',
+    processing: 'bg-indigo-500/15 text-indigo-300 border border-indigo-400/30',
     completed: 'bg-emerald-500/15 text-emerald-300 border border-emerald-400/30',
     failed: 'bg-rose-500/15 text-rose-300 border border-rose-400/30',
     cancelled: 'bg-slate-500/15 text-slate-300 border border-slate-400/30',
@@ -60,54 +60,78 @@ function Stat({ label, value }: StatProps) {
   );
 }
 
+// Converte o status bruto do NocoDB para o status do painel
 function statusDbToJobStatus(dbStatus?: string | null): JobStatus {
-  switch ((dbStatus || '').toLowerCase()) {
-    case 'published':
-    case 'publicado':
-      return 'completed';
-    case 'draft':
-    case 'rascunho':
-      return 'queued';
-    default:
-      return 'queued';
-  }
+  const s = String(dbStatus || '').toLowerCase();
+  if (s === 'published' || s === 'publicado') return 'completed';
+  if (s === 'processing' || s === 'processando') return 'processing';
+  if (s === 'queued' || s === 'queue' || s === 'rascunho' || s === 'draft') return 'queued';
+  if (s === 'failed' || s === 'erro' || s === 'error') return 'failed';
+  if (s === 'cancelled' || s === 'canceled' || s === 'cancelado') return 'cancelled';
+  // fallback conservador
+  return 'queued';
+}
+
+function safeDateString(v?: string | null) {
+  if (!v) return null;
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d.toLocaleString('pt-BR');
 }
 
 async function fetchData(): Promise<DashboardData> {
+  // Métricas (publicados / total)
   const metrics = await getAdminMetrics();
 
+  // Perfis mais recentes (já ordenados por UpdatedAt desc dentro de listProfiles)
   const { data: perfis } = await listProfiles({ page: 1, perPage: 12 });
-  const recentJobs: DashboardJob[] = (perfis as Profile[]).map((p) => ({
-    id: p.id,
-    status: statusDbToJobStatus(p.status),
-    nome: p.display_name ?? '(sem nome)',
-    nicho: p.sector ?? '-',
-    categoria: p.sector ?? '-',
-    created_at: p.created_at,
-    updated_at: p.updated_at,
-  }));
 
+  // Mapeia linhas do NocoDB para "jobs" do painel
+  const recentJobs: DashboardJob[] = (perfis as Profile[]).map((p) => {
+    // NocoDB pode ter coluna "nicho" — tentamos ler; se não existir, usamos sector/categoria
+    const anyP = p as any;
+    const nicho = (anyP.nicho ?? p.sector ?? anyP.category ?? '-') as string;
+
+    return {
+      id: String(p.id),
+      status: statusDbToJobStatus(p.status),
+      nome: p.display_name ?? '(sem nome)',
+      nicho: String(nicho || '-'),
+      categoria: String(p.sector ?? anyP.category ?? '-'),
+      created_at: p.created_at ?? null,
+      updated_at: p.updated_at ?? null,
+    };
+  });
+
+  // Contadores
+  const published = metrics.publishedProfiles ?? 0;
+  const total = metrics.totalProfiles ?? 0;
+  const drafts = Math.max(0, total - published);
+
+  // Jobs pendentes = queued + processing dentre os itens listados
+  const pending = recentJobs.filter(j => j.status === 'queued' || j.status === 'processing').length;
+  const failed = recentJobs.filter(j => j.status === 'failed').length;
+
+  // Webhooks (somente indicadores visuais)
   const webhooks: WebhookInfo[] = [];
   const whGen =
     process.env.NEXT_PUBLIC_N8N_WEBHOOK_URL ||
     process.env.N8N_WEBHOOK_URL ||
-    process.env.N8N_LUMINA_CREATE;
+    process.env.N8N_START_WEBHOOK ||    // nome que você usa no .env
+    process.env.N8N_LUMINA_CREATE;      // compat
   if (whGen) webhooks.push({ id: 'wh1', name: 'n8n-generate', url: whGen, enabled: true });
 
-  const whStories = process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL || process.env.N8N_WEBSTORIES_URL;
+  const whStories =
+    process.env.NEXT_PUBLIC_N8N_WEBSTORIES_URL ||
+    process.env.N8N_WEBSTORIES_URL ||
+    '';
   if (whStories) webhooks.push({ id: 'wh2', name: 'n8n-webstories', url: whStories, enabled: true });
-
-  const published = metrics.publishedProfiles ?? 0;
-  const total = metrics.totalProfiles ?? 0;
-  const drafts = Math.max(0, total - published);
-  const pending = drafts;
 
   return {
     counters: {
       perfis_publicados: published,
       perfis_rascunho: drafts,
       jobs_pendentes: pending,
-      jobs_falhos: 0,
+      jobs_falhos: failed,
     },
     recentJobs,
     webhooks,
@@ -138,7 +162,7 @@ export default async function AdminDashboard() {
       <div className="container py-10">
         <div className="text-rose-300">Erro: {error}</div>
         <p className="text-white/60 mt-2 text-sm">
-          Verifique as variáveis de NocoDB no <code>.env</code> (<code>NOCODB_BASE_URL</code>,{' '}
+          Verifique as variáveis do NocoDB no <code>.env</code> (<code>NOCODB_BASE_URL</code>,{' '}
           <code>NOCODB_API_TOKEN</code>, <code>NOCODB_TABLE_ID</code>).
         </p>
       </div>
@@ -197,15 +221,15 @@ export default async function AdminDashboard() {
                     <td className="py-3 pr-4 text-white/80">{j.nicho}</td>
                     <td className="py-3 pr-4"><StatusPill s={j.status} /></td>
                     <td className="py-3 pr-4 text-white/60">
-                      {new Date(j.updated_at).toLocaleString('pt-BR')}
+                      {safeDateString(j.updated_at) ?? '—'}
                     </td>
                     <td className="py-3">
                       <div className="flex gap-2">
-                        <button className="btn border-white/10 hover:bg-white/10">Ver</button>
+                        <a className="btn border-white/10 hover:bg-white/10" href={j.nome ? `/perfis?q=${encodeURIComponent(j.nome)}` : '/perfis'}>Ver</a>
                         {j.status === 'failed' && (
                           <button className="btn border-rose-400/30 text-rose-300 hover:bg-rose-500/10">Reprocessar</button>
                         )}
-                        {j.status === 'queued' && (
+                        {(j.status === 'queued' || j.status === 'processing') && (
                           <button className="btn border-white/10 hover:bg-white/10">Cancelar</button>
                         )}
                       </div>
@@ -251,7 +275,7 @@ export default async function AdminDashboard() {
             {data.webhooks.length === 0 && (
               <li className="p-3 rounded-xl bg-white/5 border border-white/10 text-white/70 text-sm">
                 Configure <code>NEXT_PUBLIC_N8N_WEBHOOK_URL</code> / <code>N8N_WEBHOOK_URL</code> ou{' '}
-                <code>N8N_LUMINA_CREATE</code> no .env.local
+                <code>N8N_START_WEBHOOK</code> no .env.local
               </li>
             )}
           </ul>
