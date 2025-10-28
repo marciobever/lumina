@@ -8,45 +8,8 @@ import NeonHero from '@/components/NeonHero'
 import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
 
-type FeaturedIn = {
-  slug: string
-  display_name?: string | null
-  name?: string | null
-  title?: string | null
-  sector?: string | null
-  cover_url?: string | null
-  hero_url?: string | null
-  avatar_url?: string | null
-}
-
-type CardOut = {
-  slug: string
-  nome: string
-  titulo?: string | null
-  categoria?: string | null
-  capa_url?: string | null
-}
-
-// Normaliza o item vindo do banco para o formato esperado pelo Card
-function toCard(p: FeaturedIn): CardOut {
-  const capa =
-    p.cover_url ||
-    p.hero_url ||
-    p.avatar_url ||
-    null
-
-  return {
-    slug: String(p.slug),
-    // 🔒 garante string SEMPRE (evita erro de tipo no build)
-    nome: String(p.display_name || p.name || p.slug || 'Perfil'),
-    titulo: p.title ?? null,
-    categoria: p.sector ?? null,
-    capa_url: capa,
-  }
-}
-
 export default async function Page() {
-  let featured: FeaturedIn[] = []
+  let featured: any[] = []
   try {
     const { data } = await listFeatured(12)
     featured = Array.isArray(data) ? data : []
@@ -54,24 +17,41 @@ export default async function Page() {
     featured = []
   }
 
-  const cards: CardOut[] = featured.map(toCard)
+  // Aceita somente registros com os 3 campos essenciais
+  const cards = featured
+    .map((p) => {
+      const nome =
+        (p.display_name ?? p.name ?? '').toString().trim()
+      const slug =
+        (p.slug ?? '').toString().trim()
+      const capa =
+        (p.cover_url ?? '').toString().trim()
+
+      return {
+        ok: !!nome && !!slug && !!capa,
+        data: {
+          slug,
+          nome,
+          titulo: p.title ?? null,
+          categoria: p.sector ?? null,
+          capa_url: capa,
+        },
+      }
+    })
+    .filter((x) => x.ok)
+    .map((x) => x.data)
 
   return (
     <div className="relative bg-[#050010] text-white">
-      {/* Fundo neon no topo */}
       <BackdropLines />
 
-      {/* BLOCO SUPERIOR: ocupa ~a dobra inteira */}
       <section
         className="relative z-10 min-h-[92vh] flex flex-col items-center"
         aria-label="Hero + busca + publicidade"
       >
-        {/* HERO */}
         <NeonHero />
 
-        {/* Conteúdo abaixo do hero, centralizado e com respiro */}
         <div className="w-full flex flex-col items-center px-4 mt-2 md:mt-0">
-          {/* BUSCA */}
           <form
             action="/perfis"
             method="get"
@@ -91,13 +71,11 @@ export default async function Page() {
             </button>
           </form>
 
-          {/* SLOT DE PUBLICIDADE (GAM — visual “bonitinho”) */}
           <div className="w-full flex justify-center mt-8">
             <div className="w-full max-w-[336px] flex flex-col items-center">
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
                 Publicidade
               </div>
-
               <div
                 id="Content1"
                 className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
@@ -108,17 +86,14 @@ export default async function Page() {
             </div>
           </div>
 
-          {/* Dica de rolagem + respiro para empurrar a próxima seção abaixo da dobra */}
           <div className="text-center text-white/70 mt-6">
             ↓ role para ver os destaques
           </div>
 
-          {/* Espaço de segurança para não vazar o título da próxima seção */}
           <div className="h-16 sm:h-20 md:h-24" />
         </div>
       </section>
 
-      {/* DESTAQUES – começa abaixo da dobra sem “vazar” */}
       <section
         id="destaques"
         className="relative section scroll-mt-24 bg-gradient-to-b from-transparent via-[#08001A]/80 to-[#050010]"
