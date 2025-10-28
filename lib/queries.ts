@@ -7,6 +7,7 @@ export type Profile = {
   display_name: string
   title: string | null
   sector: string | null
+  nicho?: string | null
   city: string | null
   bio: string | null
   headline: string | null
@@ -94,6 +95,7 @@ function mapRowToProfile(row: AnyObj): Profile {
     display_name: display,
     title: row.title ?? null,
     sector: row.sector ?? row.category ?? null,
+    nicho: row.nicho ?? null,
     city: row.city ?? null,
     bio: row.bio ?? null,
     headline: row.headline ?? null,
@@ -159,6 +161,7 @@ export type ListParams = {
   perPage?: number
   q?: string
   sector?: string
+  nicho?: string
   status?: "draft" | "published" | string
 }
 
@@ -174,6 +177,7 @@ export async function listProfiles(params: ListParams = {}) {
     wh.push(encodeURIComponent(`(display_name,like,%25${k}%25)`))
   }
   if (params.sector) wh.push(encodeURIComponent(`(sector,eq,${params.sector})`))
+  if (params.nicho)  wh.push(encodeURIComponent(`(nicho,eq,${params.nicho})`))
   if (params.status) wh.push(encodeURIComponent(`(status,eq,${params.status})`))
 
   const qs = `${wh.length ? `where=${wh.join("&where=")}&` : ""}limit=${perPage}&offset=${offset}&sort=-UpdatedAt`
@@ -182,7 +186,7 @@ export async function listProfiles(params: ListParams = {}) {
   if (params.q) {
     const k = params.q.toLowerCase()
     list.splice(0, list.length, ...list.filter((r: AnyObj) =>
-      [r.display_name, r.title, r.slug, r.city].some((v) => String(v || "").toLowerCase().includes(k))
+      [r.display_name, r.title, r.slug, r.city, r.sector, r.nicho].some((v) => String(v || "").toLowerCase().includes(k))
     ))
   }
   return {
