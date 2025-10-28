@@ -1,5 +1,6 @@
 // lib/queries.ts
 import { db } from "./supabaseServer"
+import { db, SUPABASE_READY } from './supabaseServer'
 
 // atenção: o client já aponta para o schema "lumina".
 // portanto, NÃO prefixe com "lumina." aqui.
