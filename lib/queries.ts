@@ -172,23 +172,38 @@ export async function listProfiles(params: ListParams = {}) {
 
   const t = tableId()
   const wh: string[] = []
-  if (params.q) {
-    const k = params.q.replace(/%/g, "")
-    wh.push(encodeURIComponent(`(display_name,like,%25${k}%25)`))
-  }
-  if (params.sector) wh.push(encodeURIComponent(`(sector,eq,${params.sector})`))
-  if (params.nicho)  wh.push(encodeURIComponent(`(nicho,eq,${params.nicho})`))
+
+  // Somente campos "seguros" no WHERE para evitar 422
   if (params.status) wh.push(encodeURIComponent(`(status,eq,${params.status})`))
 
   const qs = `${wh.length ? `where=${wh.join("&where=")}&` : ""}limit=${perPage}&offset=${offset}&sort=-UpdatedAt`
   const json = await nc(`/api/v2/tables/${t}/records?${qs}`)
-  const list: AnyObj[] = json?.list ?? []
+  let list: AnyObj[] = json?.list ?? []
+
+  // Filtro por texto (após fetch) cobrindo múltiplos campos
   if (params.q) {
     const k = params.q.toLowerCase()
-    list.splice(0, list.length, ...list.filter((r: AnyObj) =>
-      [r.display_name, r.title, r.slug, r.city, r.sector, r.nicho].some((v) => String(v || "").toLowerCase().includes(k))
-    ))
+    list = list.filter((r: AnyObj) =>
+      [r.display_name, r.name, r.title, r.slug, r.city, r.sector, r.category, r.nicho, Array.isArray(r.tags) ? r.tags.join(" ") : r.tags]
+        .some((v) => String(v || "").toLowerCase().includes(k))
+    )
   }
+
+  // Filtro por setor (server-side)
+  if (params.sector) {
+    const want = params.sector.toLowerCase()
+    list = list.filter((r: AnyObj) => {
+      const v = String(r.sector ?? r.category ?? "").toLowerCase()
+      return v === want || v.includes(want)
+    })
+  }
+
+  // Filtro por nicho (server-side)
+  if (params.nicho) {
+    const want = params.nicho.toLowerCase()
+    list = list.filter((r: AnyObj) => String(r.nicho ?? "").toLowerCase().includes(want))
+  }
+
   return {
     data: list.map(mapRowToProfile) as Profile[],
     total: Number(json?.pageInfo?.totalRows || list.length),
