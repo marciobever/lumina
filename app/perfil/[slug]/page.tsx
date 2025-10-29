@@ -1,15 +1,15 @@
 // app/perfil/[slug]/page.tsx
 import { notFound } from 'next/navigation'
 import Script from 'next/script'
-// import AdSlot from '@/components/AdSlot' // removido
 
 import ProfileHeader from '@/components/ProfileHeader'
 import ProfileAbout from '@/components/ProfileAbout'
 import ProfileSimilarBlock from '@/components/ProfileSimilarBlock'
 import ProfileEditorial from '@/components/ProfileEditorial'
 import WhatsAppBanner from '@/components/WhatsAppBanner'
-import { normalizeArticle } from '@/lib/adapters/article'
+import ProfileGalleryBlock from '@/components/ProfileGalleryBlock' // ⬅️ novo
 
+import { normalizeArticle } from '@/lib/adapters/article'
 import {
   getProfileBySlug,
   getProfilePhotos,
@@ -168,7 +168,8 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
   const apiPhotos = photosRes.status === 'fulfilled' ? photosRes.value : []
   const similar = similarRes.status === 'fulfilled' && Array.isArray(similarRes.value) ? similarRes.value : []
 
-  const { images } = buildGallery({
+  // ⬇️ agora pegamos `photos` (além de `images`, se quiser usar em outro lugar)
+  const { photos, images } = buildGallery({
     apiPhotos,
     gallery_urls: (p as any).gallery_urls,
     hero_url: (p as any).hero_url ?? null,
@@ -178,7 +179,6 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
     min: 8,
   })
 
-  // ✅ normaliza o fallback para casar com o tipo esperado
   const articleNorm = normalizeArticle((p as any).article)
   const article = articleNorm && articleNorm.content?.length
     ? articleNorm
@@ -282,7 +282,6 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
               {/* SOBRE */}
               <section className="card px-6 md:px-8 py-7 md:py-9" id="sobre">
                 <h2 className="text-2xl font-semibold text-white/95 mb-6">Sobre</h2>
-                {/* ✅ ProfileAbout agora só recebe `text` (sem `tags`) */}
                 <ProfileAbout text={(p as any).bio || (p as any).short_bio} />
               </section>
 
@@ -313,23 +312,15 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
                 <h2 className="text-2xl font-semibold text-white/95 mb-4">Verifique sua elegibilidade</h2>
               </section>
 
-              {/* GALERIA */}
-              <section className="card px-6 md:px-8 py-7 md:py-9" id="galeria">
-                <h2 className="text-2xl font-semibold text-white/95 mb-6">Galeria</h2>
-                {images?.length ? (
-                  <>
-                    <div className="mt-6 gallery-grid">
-                      {images.slice(0, 8).map((src, i) => (
-                        <figure key={i} className="gallery-item img-smooth aspect-square group overflow-hidden rounded-2xl">
-                          <div className="absolute inset-0 bg-white/[0.04] animate-pulse" />
-                          <div className="gallery-img transition-transform duration-500 group-hover:scale-110" style={{ backgroundImage: `url("${src.replace(/"/g, '\\"')}")` }} aria-label={`Foto ${i + 1} — ${name}`} />
-                        </figure>
-                      ))}
-                    </div>
-                    <p className="mt-5 text-xs text-white/40 italic">* Visual PG-13 — sem clique.</p>
-                  </>
+              {/* GALERIA — agora via ProfileGalleryBlock (abre lightbox/zoom) */}
+              <section id="galeria">
+                {photos?.length ? (
+                  <ProfileGalleryBlock photos={photos} />
                 ) : (
-                  <p className="mt-2 text-white/60 text-base">Sem imagens disponíveis.</p>
+                  <div className="card px-6 md:px-8 py-7 md:py-9">
+                    <h2 className="text-2xl font-semibold text-white/95 mb-6">Galeria</h2>
+                    <p className="mt-2 text-white/60 text-base">Sem imagens disponíveis.</p>
+                  </div>
                 )}
               </section>
 
