@@ -7,7 +7,7 @@ import ProfileAbout from '@/components/ProfileAbout'
 import ProfileSimilarBlock from '@/components/ProfileSimilarBlock'
 import ProfileEditorial from '@/components/ProfileEditorial'
 import WhatsAppBanner from '@/components/WhatsAppBanner'
-import ProfileGalleryBlock from '@/components/ProfileGalleryBlock' // ⬅️ novo
+import ProfileGalleryBlock from '@/components/ProfileGalleryBlock'
 
 import { normalizeArticle } from '@/lib/adapters/article'
 import {
@@ -168,8 +168,7 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
   const apiPhotos = photosRes.status === 'fulfilled' ? photosRes.value : []
   const similar = similarRes.status === 'fulfilled' && Array.isArray(similarRes.value) ? similarRes.value : []
 
-  // ⬇️ agora pegamos `photos` (além de `images`, se quiser usar em outro lugar)
-  const { photos, images } = buildGallery({
+  const { photos } = buildGallery({
     apiPhotos,
     gallery_urls: (p as any).gallery_urls,
     hero_url: (p as any).hero_url ?? null,
@@ -185,8 +184,6 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
     : normalizeArticle(buildFallbackArticle(p))
 
   const slug = (p as any).slug
-  const showAds = !!(p as any).exibir_anuncios
-
   const site = process.env.NEXT_PUBLIC_SITE_URL || 'https://example.com'
   const name = (p as any).display_name ?? (p as any).name ?? p.slug
   const jsonLd = {
@@ -220,25 +217,6 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
 
       {/* toggle sem JS: #quiz escondido até ser acionado por âncora */}
       <style>{`#quiz{display:none} #quiz:target{display:block}`}</style>
-
-      {/* AD topo (placeholder GAM) */}
-      {showAds && (
-        <div className="container pt-8 pb-4">
-          <div className="w-full flex justify-center">
-            <div className="w-full max-w-[728px] flex flex-col items-center">
-              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
-              <div
-                id="LeaderboardTopo"
-                data-gam-slot={(p as any)?.ad_slot_topo || process.env.NEXT_PUBLIC_GAM_LEADERBOARD || ''}
-                className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
-                aria-label="Anúncio topo"
-              >
-                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* HEADER */}
       <ProfileHeader
@@ -276,115 +254,48 @@ export default async function PerfilPage({ params }: { params: { slug: string } 
 
       <div className="pb-16">
         <div className="container">
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-8">
-            {/* Principal */}
-            <div className="min-w-0 space-y-10">
-              {/* SOBRE */}
-              <section className="card px-6 md:px-8 py-7 md:py-9" id="sobre">
-                <h2 className="text-2xl font-semibold text-white/95 mb-6">Sobre</h2>
-                <ProfileAbout text={(p as any).bio || (p as any).short_bio} />
-              </section>
+          {/* 🔥 SEM LATERAL: coluna única em toda a página */}
+          <div className="grid grid-cols-1 gap-8">
+            {/* SOBRE */}
+            <section className="card px-6 md:px-8 py-7 md:py-9" id="sobre">
+              <h2 className="text-2xl font-semibold text-white/95 mb-6">Sobre</h2>
+              <ProfileAbout text={(p as any).bio || (p as any).short_bio} />
+            </section>
 
-              {/* EDITORIAL */}
-              <section id="editorial" className="scroll-mt-24">
-                <ProfileEditorial article={article} />
-              </section>
+            {/* EDITORIAL */}
+            <section id="editorial" className="scroll-mt-24">
+              <ProfileEditorial article={article} />
+            </section>
 
-              {/* Banner Ad no meio (placeholder) */}
-              {showAds && (
-                <div className="my-8 flex justify-center">
-                  <div className="w-full max-w-[728px] flex flex-col items-center">
-                    <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
-                    <div
-                      id="Content2"
-                      data-gam-slot={(p as any)?.ad_slot_meio || process.env.NEXT_PUBLIC_GAM_CONTENT2 || ''}
-                      className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
-                      aria-label="Anúncio meio"
-                    >
-                      <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                    </div>
-                  </div>
+            {/* QUIZ */}
+            <section id="quiz" className="card px-6 md:px-8 py-7 md:py-9 scroll-mt-24">
+              <h2 className="text-2xl font-semibold text-white/95 mb-4">Verifique sua elegibilidade</h2>
+            </section>
+
+            {/* GALERIA */}
+            <section id="galeria">
+              {photos?.length ? (
+                <ProfileGalleryBlock photos={photos} />
+              ) : (
+                <div className="card px-6 md:px-8 py-7 md:py-9">
+                  <h2 className="text-2xl font-semibold text-white/95 mb-6">Galeria</h2>
+                  <p className="mt-2 text-white/60 text-base">Sem imagens disponíveis.</p>
                 </div>
               )}
+            </section>
 
-              {/* QUIZ */}
-              <section id="quiz" className="card px-6 md:px-8 py-7 md:py-9 scroll-mt-24">
-                <h2 className="text-2xl font-semibold text-white/95 mb-4">Verifique sua elegibilidade</h2>
+            {/* SEMELHANTES */}
+            {similar.length > 0 ? (
+              <section className="card px-6 md:px-8 py-7 md:py-9">
+                <h2 className="text-2xl font-semibold text-white/95 mb-6">Perfis semelhantes</h2>
+                <div className="mt-6">
+                  <ProfileSimilarBlock items={similar} />
+                </div>
               </section>
-
-              {/* GALERIA — agora via ProfileGalleryBlock (abre lightbox/zoom) */}
-              <section id="galeria">
-                {photos?.length ? (
-                  <ProfileGalleryBlock photos={photos} />
-                ) : (
-                  <div className="card px-6 md:px-8 py-7 md:py-9">
-                    <h2 className="text-2xl font-semibold text-white/95 mb-6">Galeria</h2>
-                    <p className="mt-2 text-white/60 text-base">Sem imagens disponíveis.</p>
-                  </div>
-                )}
-              </section>
-
-              {/* SEMELHANTES */}
-              {similar.length > 0 ? (
-                <section className="card px-6 md:px-8 py-7 md:py-9">
-                  <h2 className="text-2xl font-semibold text-white/95 mb-6">Perfis semelhantes</h2>
-                  <div className="mt-6">
-                    <ProfileSimilarBlock items={similar} />
-                  </div>
-                </section>
-              ) : null}
-            </div>
-
-            {/* Lateral */}
-            <aside className="hidden lg:block">
-              <div className="sticky top-24 space-y-8">
-                {showAds && (
-                  <>
-                    <div className="w-[300px]">
-                      <div
-                        id="SkyscraperProfile"
-                        data-gam-slot={(p as any)?.ad_slot_side || process.env.NEXT_PUBLIC_GAM_SKYSCRAPER || ''}
-                        className="w-[300px] h-[600px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
-                        aria-label="Anúncio lateral skyscraper"
-                      >
-                        <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                      </div>
-                    </div>
-
-                    <div className="w-[300px]">
-                      <div
-                        id="RectangleSide"
-                        data-gam-slot={(p as any)?.ad_slot_rodape || process.env.NEXT_PUBLIC_GAM_RECTANGLE || ''}
-                        className="w-[300px] h-[250px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
-                        aria-label="Anúncio lateral retângulo"
-                      >
-                        <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                      </div>
-                    </div>
-                  </>
-                )}
-              </div>
-            </aside>
+            ) : null}
           </div>
         </div>
       </div>
-
-      {/* Rodapé com anúncio (placeholder) */}
-      {showAds && (
-        <div className="mt-2 mb-10 flex justify-center">
-          <div className="w-full max-w-[728px] flex flex-col items-center">
-            <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
-            <div
-              id="Content3"
-              data-gam-slot={(p as any)?.ad_slot_rodape || process.env.NEXT_PUBLIC_GAM_CONTENT3 || ''}
-              className="w-full min-h-[90px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm"
-              aria-label="Anúncio rodapé"
-            >
-              <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
