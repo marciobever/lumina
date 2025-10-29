@@ -75,25 +75,25 @@ export default function GalleryGrid({ photos }: Props) {
 
   return (
     <>
-      {/* Grade 2x4 com altura fixa por tile */}
-      <div className="grid grid-cols-2 gap-3 md:gap-4">
-        {items.map((ph, i) => (
-          <button
-            key={i}
-            onClick={() => open(i)}
-            aria-label={`Abrir foto ${i + 1}`}
-            className="group relative w-full h-56 md:h-64 overflow-hidden rounded-2xl"
-          >
-            <img
-              src={ph.image_url}
-              alt={ph.alt || `Foto ${i + 1}`}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-              loading="lazy"
-              draggable={false}
-            />
-          </button>
-        ))}
-      </div>
+      {/* Grade 2x4: 2 colunas no mobile, 4 colunas no desktop */}
+<div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+  {items.map((ph, i) => (
+    <button
+      key={i}
+      onClick={() => open(i)}
+      aria-label={`Abrir foto ${i + 1}`}
+      className="group relative w-full h-48 md:h-56 overflow-hidden rounded-2xl"
+    >
+      <img
+        src={ph.image_url}
+        alt={ph.alt || `Foto ${i + 1}`}
+        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        loading="lazy"
+        draggable={false}
+      />
+    </button>
+  ))}
+</div>
 
       {/* Lightbox centralizado via portal */}
       {isOpen && typeof window !== "undefined" &&
