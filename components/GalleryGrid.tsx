@@ -5,7 +5,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 export type Photo = { image_url: string; alt?: string };
-
 type Props = { photos: Photo[] };
 
 export default function GalleryGrid({ photos }: Props) {
@@ -32,8 +31,7 @@ export default function GalleryGrid({ photos }: Props) {
 
   const onWheel: React.WheelEventHandler<HTMLDivElement> = (e) => {
     e.preventDefault();
-    const delta = -e.deltaY;
-    const step = delta > 0 ? 0.1 : -0.1;
+    const step = e.deltaY < 0 ? 0.1 : -0.1;
     setScale((s) => clamp(Number((s + step).toFixed(2)), 1, 4));
   };
   const onMouseDown: React.MouseEventHandler<HTMLDivElement> = (e) => {
@@ -75,38 +73,40 @@ export default function GalleryGrid({ photos }: Props) {
 
   return (
     <>
-      {/* Grade 2x4: 2 colunas no mobile, 4 colunas no desktop */}
-<div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-  {items.map((ph, i) => (
-    <button
-      key={i}
-      onClick={() => open(i)}
-      aria-label={`Abrir foto ${i + 1}`}
-      className="group relative w-full h-48 md:h-56 overflow-hidden rounded-2xl"
-    >
-      <img
-        src={ph.image_url}
-        alt={ph.alt || `Foto ${i + 1}`}
-        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-        loading="lazy"
-        draggable={false}
-      />
-    </button>
-  ))}
-</div>
+      {/* Grade 2x4: 2 col no mobile, 4 col no desktop */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        {items.map((ph, i) => (
+          <button
+            key={i}
+            onClick={() => open(i)}
+            aria-label={`Abrir foto ${i + 1}`}
+            className="group relative w-full h-48 md:h-56 overflow-hidden rounded-2xl"
+            type="button"
+          >
+            <img
+              src={ph.image_url}
+              alt={ph.alt || `Foto ${i + 1}`}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+              loading="lazy"
+              draggable={false}
+            />
+          </button>
+        ))}
+      </div>
 
-      {/* Lightbox centralizado via portal */}
+      {/* Lightbox centralizado via portal (z-index máximo + pointer-events) */}
       {isOpen && typeof window !== "undefined" &&
         createPortal(
           <div
-            className="fixed inset-0 z-[100] bg-black/80"
+            className="fixed inset-0 z-[9999] bg-black/80 pointer-events-auto"
             role="dialog"
             aria-modal="true"
             onClick={(e) => { if (e.target === e.currentTarget) close(); }}
           >
             <button
-              onClick={close}
-              className="absolute top-4 right-4 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 text-sm"
+              type="button"
+              onClick={(e) => { e.stopPropagation(); close(); }}
+              className="absolute top-4 right-4 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 text-sm pointer-events-auto"
               aria-label="Fechar"
             >
               Fechar ✕
@@ -115,15 +115,17 @@ export default function GalleryGrid({ photos }: Props) {
             {items.length > 1 && (
               <>
                 <button
-                  onClick={prev}
-                  className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-2"
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); prev(); }}
+                  className="absolute left-3 md:left-6 top-1/2 -translate-y-1/2 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-2 pointer-events-auto"
                   aria-label="Anterior"
                 >
                   ←
                 </button>
                 <button
-                  onClick={next}
-                  className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-2"
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); next(); }}
+                  className="absolute right-3 md:right-6 top-1/2 -translate-y-1/2 rounded-full bg-white/10 hover:bg-white/20 text-white px-3 py-2 pointer-events-auto"
                   aria-label="Próxima"
                 >
                   →
@@ -132,7 +134,8 @@ export default function GalleryGrid({ photos }: Props) {
             )}
 
             <div
-              className="absolute inset-0 flex items-center justify-center p-4 select-none"
+              className="absolute inset-0 flex items-center justify-center p-4 select-none pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
               onWheel={onWheel}
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}
@@ -153,11 +156,11 @@ export default function GalleryGrid({ photos }: Props) {
               </div>
             </div>
 
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/10 text-white rounded-full px-3 py-1.5">
-              <button className="px-2 py-1 hover:bg-white/20 rounded" onClick={() => setScale((s) => clamp(Number((s - 0.1).toFixed(2)), 1, 4))} aria-label="Diminuir zoom">−</button>
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/10 text-white rounded-full px-3 py-1.5 pointer-events-auto">
+              <button className="px-2 py-1 hover:bg-white/20 rounded" onClick={() => setScale((s) => clamp(Number((s - 0.1).toFixed(2)), 1, 4))} aria-label="Diminuir zoom" type="button">−</button>
               <span className="tabular-nums text-sm w-14 text-center">{Math.round(scale * 100)}%</span>
-              <button className="px-2 py-1 hover:bg-white/20 rounded" onClick={() => setScale((s) => clamp(Number((s + 0.1).toFixed(2)), 1, 4))} aria-label="Aumentar zoom">+</button>
-              <button className="ml-2 px-2 py-1 hover:bg-white/20 rounded" onClick={resetTransform} aria-label="Resetar zoom">Reset</button>
+              <button className="px-2 py-1 hover:bg-white/20 rounded" onClick={() => setScale((s) => clamp(Number((s + 0.1).toFixed(2)), 1, 4))} aria-label="Aumentar zoom" type="button">+</button>
+              <button className="ml-2 px-2 py-1 hover:bg-white/20 rounded" onClick={resetTransform} aria-label="Resetar zoom" type="button">Reset</button>
             </div>
           </div>,
           document.body
