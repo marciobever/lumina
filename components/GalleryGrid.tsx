@@ -184,11 +184,9 @@ export default function GalleryGrid({ photos }: Props) {
               onMouseUp={onMouseUp}
               onMouseLeave={onMouseUp}
               onDoubleClick={onDoubleClick}
-              // suporte extra para mobile/iOS
               onPointerDown={(e) => {
-                // evita que algum overlay por baixo capture esse toque
-                // @ts-expect-error pointerType existe em PointerEvent
-                if ((e as any).pointerType === "touch") e.stopPropagation();
+                // evita que algum overlay por baixo capture esse toque (iOS)
+                if (e.pointerType === "touch") e.stopPropagation();
               }}
             >
               <div
