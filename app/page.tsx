@@ -11,7 +11,6 @@ import NewsletterSection from '@/components/NewsletterSection'
 export default async function Page() {
   let featured: any[] = []
   try {
-    // Busca no máximo 3 destaques
     const { data } = await listFeatured(3)
     featured = Array.isArray(data) ? data : []
   } catch {
@@ -43,7 +42,7 @@ export default async function Page() {
 
       <section
         className="relative z-10 min-h-[92vh] flex flex-col items-center"
-        aria-label="Hero + busca + publicidade"
+        aria-label="Hero + busca"
       >
         <NeonHero />
 
@@ -67,21 +66,7 @@ export default async function Page() {
             </button>
           </form>
 
-          <div className="w-full flex justify-center mt-8">
-            <div className="w-full max-w-[336px] flex flex-col items-center">
-              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
-                Publicidade
-              </div>
-              <div
-                id="Content1"
-                className="w-full min-h-[280px] rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-              >
-                <span className="text-xs text-white/60">Carregando anúncio…</span>
-                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-              </div>
-            </div>
-          </div>
-
+          {/* Espaço visual leve para respiro do herói */}
           <div className="text-center text-white/70 mt-6">
             ↓ role para ver os destaques
           </div>
