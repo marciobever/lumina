@@ -133,6 +133,42 @@ export default function GalleryGrid({ photos }: Props) {
               if (e.target === e.currentTarget) close();
             }}
           >
+            {/*
+             * Área de gestos (PRIMEIRO FILHO)
+             * Fica no fundo (stacking order) para que os botões por cima
+             * possam ser clicados.
+             */}
+            <div
+              className="absolute inset-0 flex items-center justify-center p-4 select-none pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+              onWheel={onWheel}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseUp}
+              onDoubleClick={onDoubleClick}
+              onPointerDown={(e) => {
+                // evita que algum overlay por baixo capture esse toque (iOS)
+                if (e.pointerType === "touch") e.stopPropagation();
+              }}
+            >
+              <div
+                className="will-change-transform transition-transform duration-75 cursor-grab active:cursor-grabbing"
+                style={{
+                  transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
+                }}
+              >
+                <img
+                  src={items[idx]?.image_url}
+                  alt={items[idx]?.alt || `Foto ${idx + 1}`}
+                  className="max-h-[92dvh] max-w-[95vw] object-contain m-0"
+                  draggable={false}
+                />
+              </div>
+            </div>
+
+            {/* --- Controlos (declaração DEPOIS da área de gestos) --- */}
+
             {/* Botão fechar */}
             <button
               type="button"
@@ -173,36 +209,6 @@ export default function GalleryGrid({ photos }: Props) {
                 </button>
               </>
             )}
-
-            {/* Área de imagem / gestos */}
-            <div
-              className="absolute inset-0 flex items-center justify-center p-4 select-none pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
-              onWheel={onWheel}
-              onMouseDown={onMouseDown}
-              onMouseMove={onMouseMove}
-              onMouseUp={onMouseUp}
-              onMouseLeave={onMouseUp}
-              onDoubleClick={onDoubleClick}
-              onPointerDown={(e) => {
-                // evita que algum overlay por baixo capture esse toque (iOS)
-                if (e.pointerType === "touch") e.stopPropagation();
-              }}
-            >
-              <div
-                className="will-change-transform transition-transform duration-75 cursor-grab active:cursor-grabbing"
-                style={{
-                  transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
-                }}
-              >
-                <img
-                  src={items[idx]?.image_url}
-                  alt={items[idx]?.alt || `Foto ${idx + 1}`}
-                  className="max-h-[92dvh] max-w-[95vw] object-contain m-0"
-                  draggable={false}
-                />
-              </div>
-            </div>
 
             {/* Controles de zoom */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/10 text-white rounded-full px-3 py-1.5 pointer-events-auto">
