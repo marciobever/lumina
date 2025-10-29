@@ -9,177 +9,103 @@ const playfair = Playfair_Display({ subsets: ['latin'], variable: '--font-displa
 const manrope  = Manrope({ subsets: ['latin'], variable: '--font-sans' })
 
 export const metadata = {
-  title: 'LUMINA — Perfis Glamourosos (PG-13)',
-  description: 'Diretório editorial feminino. Glamour, estilo e curadoria — PG-13.',
+  title: 'LUMINA — Perfis Glamourosos (PG-13)',
+  description: 'Diretório editorial feminino. Glamour, estilo e curadoria — PG-13.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="pt-br">
-      <head>
-        {/* GPT.js */}
-        <Script
-          id="gpt-lib"
-          src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"
-          strategy="afterInteractive"
-        />
-      </head>
-      <body className={`${manrope.variable} ${playfair.variable} font-sans bg-[#050010] text-white`}>
-        {/* Bootstrap GAM: UTM targeting, Interstitial, Anchor e Content1..Content9 */}
-        <Script id="gpt-bootstrap" strategy="afterInteractive">
-          {`
+  return (
+    <html lang="pt-br">
+      <head>
+        {/* GPT.js */}
+        <Script
+          id="gpt-lib"
+          src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"
+          strategy="afterInteractive"
+        />
+      </head>
+      <body className={`${manrope.variable} ${playfair.variable} font-sans bg-[#050010] text-white`}>
+        {/* Bootstrap GAM: Configurações GLOBAIS (Anchor, Interstitial, Init) */}
+        <Script id="gpt-bootstrap-global" strategy="afterInteractive">
+          {`
 (function(){
-  // Estado global para evitar repetições
-  window.__luminaGpt = window.__luminaGpt || { inited:false, slots:{}, displayed:{} };
+  // Estado global (apenas para o mapping)
+  window.__luminaGpt = window.__luminaGpt || { inited: false };
+  window.googletag = window.googletag || { cmd: [] };
 
-  window.googletag = window.googletag || { cmd: [] };
+  function setup() {
+    if (window.__luminaGpt.inited) return; // Só executa uma vez
+    window.__luminaGpt.inited = true;
 
-  function setup() {
-    if (window.__luminaGpt.inited) return;
-    window.__luminaGpt.inited = true;
+    googletag.cmd.push(function () {
+      // ---- Targeting UTM ----
+      try {
+        var q = new URLSearchParams(window.location.search || "");
+        var utm_source   = q.get("utm_source");
+        var utm_medium   = q.get("utm_medium");
+        var utm_campaign = q.get("utm_campaign");
+        if (utm_source)   googletag.pubads().setTargeting('utm_source',   [utm_source]);
+        if (utm_medium)   googletag.pubads().setTargeting('utm_medium',   [utm_medium]);
+        if (utm_campaign) googletag.pubads().setTargeting('utm_campaign', [utm_campaign]);
+      } catch (e) {}
 
-    googletag.cmd.push(function () {
-      // ---- Targeting UTM ----
-      try {
-        var q = new URLSearchParams(window.location.search || "");
-        var utm_source   = q.get("utm_source");
-        var utm_medium   = q.get("utm_medium");
-        var utm_campaign = q.get("utm_campaign");
-        if (utm_source)   googletag.pubads().setTargeting('utm_source',   [utm_source]);
-        if (utm_medium)   googletag.pubads().setTargeting('utm_medium',   [utm_medium]);
-        if (utm_campaign) googletag.pubads().setTargeting('utm_campaign', [utm_campaign]);
-      } catch (e) {}
+      // ---- Size Mapping (será usado pelas páginas) ----
+      var rectMapping = googletag.sizeMapping()
+        .addSize([0,0], ['fluid', [250,250], [300,250], [336,280]])
+        .build();
+      
+      // Guarda mapping para reuso nas páginas
+      window.__luminaGpt.rectMapping = rectMapping;
 
-      // ---- Size Mapping comum (retângulos / fluid) ----
-      var rectMapping = googletag.sizeMapping()
-        .addSize([0,0], ['fluid', [250,250], [300,250], [336,280]])
-        .build();
+      // ---- Interstitial ----
+      var slotInt = googletag.defineOutOfPageSlot(
+        '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Interstitial',
+        googletag.enums.OutOfPageFormat.INTERSTITIAL
+      );
+      if (slotInt) slotInt.addService(googletag.pubads());
 
-      // Guarda mapping para reuso
-      window.__luminaGpt.rectMapping = rectMapping;
+      // ---- Anchor (BOTTOM) ----
+      var slotAnchor = googletag.defineOutOfPageSlot(
+        '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Anchor',
+        googletag.enums.OutOfPageFormat.BOTTOM_ANCHOR
+      );
+      if (slotAnchor) slotAnchor.addService(googletag.pubads());
 
-      // ---- Interstitial ----
-      try {
-        var slotInt = googletag.defineOutOfPageSlot(
-          '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Interstitial',
-          googletag.enums.OutOfPageFormat.INTERSTITIAL
-        );
-        if (slotInt) {
-          slotInt.addService(googletag.pubads());
-          window.__luminaGpt.slotInt = slotInt;
-        }
-      } catch (e) {}
+      // ---- Lazy load global + collapse ----
+      googletag.pubads().enableLazyLoad({
+        fetchMarginPercent: 20,
+        renderMarginPercent: 10,
+        mobileScaling: 2.0
+      });
+      googletag.pubads().collapseEmptyDivs(true);
 
-      // ---- Anchor (BOTTOM) ----
-try {
-  var slotAnchor = googletag.defineOutOfPageSlot(
-    '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Anchor',
-    googletag.enums.OutOfPageFormat.BOTTOM_ANCHOR // ← mudou de TOP_ para BOTTOM_
-  );
-  if (slotAnchor) {
-    slotAnchor.addService(googletag.pubads());
-    window.__luminaGpt.slotAnchor = slotAnchor;
-  }
-} catch (e) {}
+      // ---- Ativa SRA (Single Request Architecture) ----
+      // CRUCIAL para a lógica de refresh das páginas funcionar
+      googletag.pubads().enableSingleRequest();
 
-      // ---- Lazy load global + collapse ----
-      try {
-        googletag.pubads().enableLazyLoad({
-          fetchMarginPercent: 20,
-          renderMarginPercent: 10,
-          mobileScaling: 2.0
-        });
-        googletag.pubads().collapseEmptyDivs(true);
-      } catch (e) {}
+      // ---- Ativa serviços uma vez ----
+      googletag.enableServices();
 
-      // ---- Ativa serviços uma vez ----
-      googletag.enableServices();
+      // ---- Exibir out-of-page ----
+      // O SRA vai "segurar" este pedido até ao primeiro refresh
+      if (slotInt) googletag.display(slotInt);
+      if (slotAnchor) googletag.display(slotAnchor);
+    });
+  }
 
-      // ---- Exibir out-of-page uma vez ----
-      try { if (window.__luminaGpt.slotInt) googletag.display(window.__luminaGpt.slotInt); } catch(e){}
-      try { if (window.__luminaGpt.slotAnchor) googletag.display(window.__luminaGpt.slotAnchor); } catch(e){}
-    });
-  }
-
-  // Cria/mostra um slot ContentX quando o div aparece
-  function ensureSlot(id) {
-    if (!id) return;
-    var el = document.getElementById(id);
-    if (!el) return;
-
-    googletag.cmd.push(function () {
-      // Se já temos o slot definido, só exibe (uma vez)
-      if (!window.__luminaGpt.slots[id]) {
-        var path = '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_' + id;
-
-        var slot = googletag.defineSlot(
-          path,
-          [[250,250],[300,250],[336,280]],
-          id
-        );
-
-        if (slot) {
-          slot.defineSizeMapping(window.__luminaGpt.rectMapping)
-              .setCollapseEmptyDiv(true)
-              .addService(googletag.pubads());
-          window.__luminaGpt.slots[id] = slot;
-        }
-      }
-
-      // Display apenas uma vez por div
-      if (!window.__luminaGpt.displayed[id]) {
-        window.__luminaGpt.displayed[id] = true;
-        googletag.display(id);
-      }
-    });
-  }
-
-  // IDs suportados (iguais ao WP)
-  var ids = ['Content1','Content2','Content3','Content4','Content5','Content6','Content7','Content8','Content9'];
-
-  // Setup inicial
-  setup();
-
-  // Primeira varredura (caso alguns divs já existam na primeira renderização)
-  function initialScan() {
-    ids.forEach(function(id){ ensureSlot(id); });
-  }
-  initialScan();
-
-  // Observa o DOM e, quando aparecer qualquer ContentX, define/exibe o slot
-  var mo = new MutationObserver(function(mutations){
-    for (var m of mutations) {
-      if (!m.addedNodes) continue;
-      for (var n of m.addedNodes) {
-        if (!(n instanceof HTMLElement)) continue;
-        // Se o nó adicionado for o próprio slot
-        if (ids.includes(n.id)) {
-          ensureSlot(n.id);
-        }
-        // Ou se contiver slots dentro
-        ids.forEach(function(id){
-          var found = n.querySelector && n.querySelector('#' + id);
-          if (found) ensureSlot(id);
-        });
-      }
-    }
-  });
-
-  try {
-    mo.observe(document.documentElement || document.body, { childList: true, subtree: true });
-  } catch(e) {}
-
+  // Setup inicial
+  setup();
 })();
-          `}
-        </Script>
+          `}
+        </Script>
 
-        {/* Wrapper flex para o footer “colar” no fim */}
-        <div className="min-h-screen flex flex-col">
-          <Header />
-          <main className="flex-1">{children}</main>
-          <Footer />
-        </div>
-      </body>
-    </html>
-  )
+        {/* Wrapper flex para o footer “colar” no fim */}
+        <div className="min-h-screen flex flex-col">
+          <Header />
+          <main className="flex-1">{children}</main>
+          <Footer />
+        </div>
+      </body>
+    </html>
+  )
 }
