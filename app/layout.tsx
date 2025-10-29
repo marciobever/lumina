@@ -70,17 +70,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         }
       } catch (e) {}
 
-      // ---- Anchor (TOP) ----
-      try {
-        var slotAnchor = googletag.defineOutOfPageSlot(
-          '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Anchor',
-          googletag.enums.OutOfPageFormat.TOP_ANCHOR
-        );
-        if (slotAnchor) {
-          slotAnchor.addService(googletag.pubads());
-          window.__luminaGpt.slotAnchor = slotAnchor;
-        }
-      } catch (e) {}
+      // ---- Anchor (BOTTOM) ----
+try {
+  var slotAnchor = googletag.defineOutOfPageSlot(
+    '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Anchor',
+    googletag.enums.OutOfPageFormat.BOTTOM_ANCHOR // ← mudou de TOP_ para BOTTOM_
+  );
+  if (slotAnchor) {
+    slotAnchor.addService(googletag.pubads());
+    window.__luminaGpt.slotAnchor = slotAnchor;
+  }
+} catch (e) {}
 
       // ---- Lazy load global + collapse ----
       try {
