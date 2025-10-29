@@ -5,11 +5,15 @@ WORKDIR /app
 # ---------- deps: instala TODAS as deps (inclui dev) ----------
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN --mount=type=cache,target=/root/.npm npm ci
+# Garante devDependencies no build, mesmo se NODE_ENV=production vier do ambiente
+ENV NPM_CONFIG_PRODUCTION=false
+RUN --mount=type=cache,target=/root/.npm npm ci --include=dev
 
 # ---------- builder: compila Next ----------
 FROM base AS builder
 ENV NEXT_TELEMETRY_DISABLED=1
+# Também garante dev deps visíveis aqui
+ENV NPM_CONFIG_PRODUCTION=false
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN --mount=type=cache,target=/root/.npm npm run build
@@ -27,7 +31,6 @@ RUN npm prune --omit=dev
 
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
-# Se existir next.config.* na raiz, copie (sem comentário na mesma linha):
 COPY --from=builder /app/next.config.* ./
 
 EXPOSE 3000
