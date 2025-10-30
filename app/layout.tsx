@@ -30,16 +30,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="gpt-bootstrap-global" strategy="afterInteractive">
           {`
 (function(){
-  // Estado global (apenas para o mapping)
   window.__luminaGpt = window.__luminaGpt || { inited: false };
   window.googletag = window.googletag || { cmd: [] };
 
   function setup() {
-    if (window.__luminaGpt.inited) return; // Só executa uma vez
+    if (window.__luminaGpt.inited) return;
     window.__luminaGpt.inited = true;
 
     googletag.cmd.push(function () {
-      // ---- Targeting UTM ----
       try {
         var q = new URLSearchParams(window.location.search || "");
         var utm_source   = q.get("utm_source");
@@ -50,61 +48,130 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         if (utm_campaign) googletag.pubads().setTargeting('utm_campaign', [utm_campaign]);
       } catch (e) {}
 
-      // ---- Size Mapping (será usado pelas páginas) ----
+      // Mapping retangular global (opcional por slot)
       var rectMapping = googletag.sizeMapping()
         .addSize([0,0], ['fluid', [250,250], [300,250], [336,280]])
         .build();
-
-      // Guarda mapping para reuso nas páginas
       window.__luminaGpt.rectMapping = rectMapping;
 
-      // ---- Interstitial ----
+      // Interstitial
       var slotInt = googletag.defineOutOfPageSlot(
         '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Interstitial',
         googletag.enums.OutOfPageFormat.INTERSTITIAL
       );
       if (slotInt) slotInt.addService(googletag.pubads());
 
-      // ---- Anchor (BOTTOM) ----
+      // Anchor
       var slotAnchor = googletag.defineOutOfPageSlot(
         '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_Anchor',
         googletag.enums.OutOfPageFormat.BOTTOM_ANCHOR
       );
       if (slotAnchor) slotAnchor.addService(googletag.pubads());
 
-      // ---- Lazy load global + collapse ----
       googletag.pubads().enableLazyLoad({
         fetchMarginPercent: 20,
         renderMarginPercent: 10,
         mobileScaling: 2.0
       });
       googletag.pubads().collapseEmptyDivs(true);
-
-      // ---- Ativa SRA (Single Request Architecture) ----
-      // CRUCIAL para a lógica de refresh das páginas funcionar
       googletag.pubads().enableSingleRequest();
-
-      // ---- Ativa serviços uma vez ----
       googletag.enableServices();
 
-      // ---- Exibir out-of-page ----
-      // O SRA vai "segurar" este pedido até ao primeiro refresh
       if (slotInt) googletag.display(slotInt);
       if (slotAnchor) googletag.display(slotAnchor);
     });
   }
-
-  // Setup inicial
   setup();
 })();
           `}
         </Script>
 
-        {/* Wrapper flex para o footer “colar” no fim */}
+        {/* Auto-define/refresh/destroy para DIVs FIXOS (efeito WordPress) */}
+        <Script id="gpt-auto-ads" strategy="afterInteractive">
+          {`
+(function(){
+  function parseJSON(raw, fallback){
+    if(!raw) return fallback;
+    try{ return JSON.parse(raw); }catch(_){ return fallback; }
+  }
+
+  function defineAll(){
+    var g = window.googletag;
+    if(!g || !g.cmd) return;
+
+    var els = Array.from(document.querySelectorAll('[data-gam-slot]'));
+    if(!els.length) return;
+
+    g.cmd.push(function(){
+      var fresh = [];
+      els.forEach(function(el){
+        var id   = el.id || '';
+        var unit = el.getAttribute('data-gam-unit') || '';
+        if(!id || !unit) return;
+
+        if (el.__gptSlot) return; // já definido neste mount
+
+        // Reserva de altura mínima (reduz CLS)
+        var minH = Number(el.getAttribute('data-gam-minh') || '0');
+        if (minH > 0) el.style.minHeight = minH + 'px';
+
+        // Tamanhos
+        var sizesAttr = el.getAttribute('data-gam-sizes');
+        var sizes = parseJSON(sizesAttr, ['fluid', [336,280], [300,250], [250,250]]);
+
+        var slot = g.defineSlot(unit, sizes, id);
+        if(!slot) return;
+
+        // Size mapping global opcional
+        var mapFlag = (el.getAttribute('data-gam-map') || '').toLowerCase();
+        if (mapFlag === 'rect' && window.__luminaGpt && window.__luminaGpt.rectMapping) {
+          try { slot.defineSizeMapping(window.__luminaGpt.rectMapping); } catch(_){}
+        }
+
+        // Targeting por slot
+        var targeting = parseJSON(el.getAttribute('data-gam-targeting'), null);
+        if (targeting && typeof targeting === 'object') {
+          Object.keys(targeting).forEach(function(k){
+            var v = targeting[k];
+            slot.setTargeting(k, Array.isArray(v) ? v : [String(v)]);
+          });
+        }
+
+        slot.addService(g.pubads());
+        el.__gptSlot = slot;
+
+        g.display(id);
+        fresh.push(slot);
+      });
+
+      if (fresh.length) {
+        g.pubads().refresh(fresh);
+      }
+    });
+  }
+
+  function destroyAll(){
+    try{
+      var els = Array.from(document.querySelectorAll('[data-gam-slot]'));
+      var slots = els.map(function(el){ return el.__gptSlot; }).filter(Boolean);
+      if (slots.length && window.googletag && window.googletag.destroySlots) {
+        window.googletag.destroySlots(slots);
+      }
+      els.forEach(function(el){ try{ el.__gptSlot = null; el.innerHTML=''; }catch(_){ } });
+    }catch(_){}
+  }
+
+  window.addEventListener('lumina:page-will-unmount', destroyAll);
+  window.addEventListener('lumina:page-mounted', defineAll);
+  document.addEventListener('DOMContentLoaded', defineAll);
+})();
+          `}
+        </Script>
+
+        {/* Estrutura */}
         <div className="min-h-screen flex flex-col">
           <Header />
           <main className="flex-1">
-            {/* Remonta todo o subtree a cada mudança de rota (efeito "WordPress-like") */}
             <RouteRemount>{children}</RouteRemount>
           </main>
           <Footer />
