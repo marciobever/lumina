@@ -5,8 +5,8 @@ import { NextResponse } from "next/server";
 /**
  * CSP para GAM/GPT + Videoo (produção + debug).
  * Ajustes desta versão:
- *  - frame-src inclui console.googletagservices.com (Pub Console em iframe)
- *  - script-src/script-src-elem incluem *.adtrafficquality.google (sodar2.js)
+ *  - frame-src inclui *.adtrafficquality.google (SODAR em iframe)
+ *  - script-src/script-src-elem incluem cdn.ampproject.org (AMP4Ads)
  */
 
 const scriptSrc = [
@@ -16,7 +16,7 @@ const scriptSrc = [
   "https://securepubads.g.doubleclick.net",
   "https://pagead2.googlesyndication.com",
   "https://www.googletagservices.com",
-  "https://console.googletagservices.com", // Pub Console
+  "https://console.googletagservices.com",
   "https://www.googleadservices.com",
   "https://tpc.googlesyndication.com",
   "https://cm.g.doubleclick.net",
@@ -25,6 +25,7 @@ const scriptSrc = [
   "https://static.videoo.tv",
   "https://*.videoo.tv",
   "https://*.adtrafficquality.google", // sodar/sodar2.js
+  "https://cdn.ampproject.org",        // AMP4Ads runtimes (amp4ads, amp-analytics, etc.)
 ];
 
 const frameSrc = [
@@ -38,7 +39,8 @@ const frameSrc = [
   "https://www.googleadservices.com",
   "https://www.google.com",
   "https://tpc.googlesyndication.com",
-  "https://console.googletagservices.com", // permitir iframe do Pub Console
+  "https://console.googletagservices.com",
+  "https://*.adtrafficquality.google", // EX: https://ep2.adtrafficquality.google
   "gmsg:",
   "https://*.videoo.tv",
 ];
@@ -52,7 +54,7 @@ const connectSrc = [
   "https://www.googleadservices.com",
   "https://tpc.googlesyndication.com",
   "https://*.videoo.tv",
-  "https://*.adtrafficquality.google", // qualidade de tráfego
+  "https://*.adtrafficquality.google",
 ];
 
 const imgSrc = [
