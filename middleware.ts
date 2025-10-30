@@ -3,14 +3,10 @@ import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 /**
- * CSP ajustada para stack de anúncios (GAM/GPT + Videoo).
- * Inclui liberações para:
- *  - Pub Console (console.googletagservices.com)
- *  - Endpoints de qualidade de tráfego (*.adtrafficquality.google)
- *  - SafeFrames (*.safeframe.googlesyndication.com) e demais iframes de anúncios
- *
- * Observação: Mantemos 'unsafe-inline' e 'unsafe-eval' por pragmatismo em ambiente Next/ads.
- * Depois, dá para apertar usando nonces/hashes se necessário.
+ * CSP para GAM/GPT + Videoo (produção + debug).
+ * Ajustes desta versão:
+ *  - frame-src inclui console.googletagservices.com (Pub Console em iframe)
+ *  - script-src/script-src-elem incluem *.adtrafficquality.google (sodar2.js)
  */
 
 const scriptSrc = [
@@ -20,14 +16,15 @@ const scriptSrc = [
   "https://securepubads.g.doubleclick.net",
   "https://pagead2.googlesyndication.com",
   "https://www.googletagservices.com",
-  "https://console.googletagservices.com", // Pub Console (erro que você viu)
+  "https://console.googletagservices.com", // Pub Console
   "https://www.googleadservices.com",
   "https://tpc.googlesyndication.com",
   "https://cm.g.doubleclick.net",
   "https://www.google.com",
-  "https://www.googletagmanager.com", // comum em criativos
+  "https://www.googletagmanager.com",
   "https://static.videoo.tv",
   "https://*.videoo.tv",
+  "https://*.adtrafficquality.google", // sodar/sodar2.js
 ];
 
 const frameSrc = [
@@ -36,11 +33,12 @@ const frameSrc = [
   "https://securepubads.g.doubleclick.net",
   "https://pagead2.googlesyndication.com",
   "https://www.googlesyndication.com",
-  "https://*.googlesyndication.com", // inclui domínios variados
-  "https://*.safeframe.googlesyndication.com", // SafeFrame (erro que você viu)
+  "https://*.googlesyndication.com",
+  "https://*.safeframe.googlesyndication.com",
   "https://www.googleadservices.com",
   "https://www.google.com",
   "https://tpc.googlesyndication.com",
+  "https://console.googletagservices.com", // permitir iframe do Pub Console
   "gmsg:",
   "https://*.videoo.tv",
 ];
@@ -54,7 +52,7 @@ const connectSrc = [
   "https://www.googleadservices.com",
   "https://tpc.googlesyndication.com",
   "https://*.videoo.tv",
-  "https://*.adtrafficquality.google", // SODAR/traffic quality (erro que você viu)
+  "https://*.adtrafficquality.google", // qualidade de tráfego
 ];
 
 const imgSrc = [
@@ -91,7 +89,6 @@ const mediaSrc = [
 
 const csp = [
   `default-src 'self';`,
-  // usar script-src-elem/script-src-attr para maior compatibilidade
   `script-src ${scriptSrc.join(" ")};`,
   `script-src-elem ${scriptSrc.join(" ")};`,
   `script-src-attr 'unsafe-inline';`,
@@ -101,18 +98,16 @@ const csp = [
   `connect-src ${connectSrc.join(" ")};`,
   `frame-src ${frameSrc.join(" ")};`,
   `media-src ${mediaSrc.join(" ")};`,
-  // Proteções adicionais
   `frame-ancestors 'self';`,
   `base-uri 'self';`,
 ].join(" ");
 
-export function middleware(req: NextRequest) {
+export function middleware(_req: NextRequest) {
   const res = NextResponse.next();
   res.headers.set("Content-Security-Policy", csp);
   res.headers.set("X-Content-Type-Options", "nosniff");
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  // X-Frame-Options é legado; mantemos SAMEORIGIN por compat, mas 'frame-ancestors' é o efetivo
-  res.headers.set("X-Frame-Options", "SAMEORIGIN");
+  res.headers.set("X-Frame-Options", "SAMEORIGIN"); // legado; 'frame-ancestors' é o efetivo
   res.headers.set("Permissions-Policy", "interest-cohort=()");
   return res;
 }
