@@ -8,6 +8,12 @@ import NeonHero from '@/components/NeonHero'
 import ProfileCard from '@/components/ProfileCard'
 import NewsletterSection from '@/components/NewsletterSection'
 
+// OOP (Anchor + Interstitial) por rota
+import RouteOOP from '@/components/RouteOOP'
+// VideooWall apenas no client
+import dynamicImport from 'next/dynamic'
+const VideooWall = dynamicImport(() => import('@/components/VideooWall'), { ssr: false })
+
 export default async function Page() {
   let featured: any[] = []
   try {
@@ -38,6 +44,11 @@ export default async function Page() {
 
   return (
     <div className="relative bg-[#050010] text-white">
+      {/* Interstitial + Anchor (monta/desmonta a cada navegação) */}
+      <RouteOOP />
+      {/* Videoo Wall (monta/desmonta por rota) */}
+      <VideooWall />
+
       <BackdropLines />
 
       <section
@@ -66,7 +77,6 @@ export default async function Page() {
             </button>
           </form>
 
-          {/* Espaço visual leve para respiro do herói */}
           <div className="text-center text-white/70 mt-6">
             ↓ role para ver os destaques
           </div>
