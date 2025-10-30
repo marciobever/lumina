@@ -1,9 +1,20 @@
 // app/perfis/page.tsx
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 import React from 'react'
 import ProfileCard from '@/components/ProfileCard'
 import Pagination from '@/components/Pagination'
 import { listProfiles } from '@/lib/queries'
-import Script from 'next/script'
+
+// OOP (Anchor + Interstitial) por rota
+import RouteOOP from '@/components/RouteOOP'
+// VideooWall apenas no client
+import dynamicImport from 'next/dynamic'
+const VideooWall = dynamicImport(() => import('@/components/VideooWall'), { ssr: false })
+
+// Inline ads via componente
+import AdSlot from '@/components/AdSlot'
 
 export const metadata = {
   title: 'Perfis • LUMINA',
@@ -66,7 +77,6 @@ export default async function PerfisPage({ searchParams }: Props) {
   const nicho = searchParams?.nicho?.trim() || undefined
 
   // ⚠️ Não filtramos mais por 'published' por padrão, para incluir 'done/queued'
-  // Se quiser forçar, passe ?status=published na URL
   const status =
     (searchParams?.status as 'draft' | 'published' | 'queued' | 'processing' | 'done' | string | undefined) ||
     undefined
@@ -80,7 +90,7 @@ export default async function PerfisPage({ searchParams }: Props) {
     status,
   })
 
-  // filtra só perfis com imagem (mulherada pronta)
+  // filtra só perfis com imagem
   const visible = Array.isArray(data) ? data.filter(hasCoverish) : []
 
   // Só 11 perfis na grade; o 12º é lookahead
@@ -94,12 +104,17 @@ export default async function PerfisPage({ searchParams }: Props) {
   if (profiles.length > 0) grid.push({ kind: 'ad' as const })
   for (let i = insertAfterIndex; i < profiles.length; i++) grid.push({ kind: 'profile', p: profiles[i] })
 
-  // Paginação: usa total do backend (não o pós-filtro local) pra não "quebrar" o hasNext
+  // Paginação: usa total do backend
   const perPageReal = perPage ?? REQUEST_SIZE
   const hasNext = total > page * perPageReal
 
   return (
     <div className="relative">
+      {/* Interstitial + Anchor (monta/desmonta a cada navegação) */}
+      <RouteOOP />
+      {/* Videoo Wall (client-only; remonta por rota) */}
+      <VideooWall />
+
       {/* Título */}
       <section className="section pt-8">
         <div className="container">
@@ -112,65 +127,22 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* Leaderboard wide no lugar da barra (728x90 desktop / 320x100/50 mobile) */}
+      {/* Leaderboard superior via componente (substitui Script + div id) */}
       <section className="section pt-2 pb-4">
         <div className="container">
           <div className="w-full flex justify-center">
             <div className="w-full max-w-6xl flex flex-col items-center">
-              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">
-                Publicidade
-              </div>
-              <div
+              <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
+              <AdSlot
                 id="LeaderboardTop"
-                className="
-                  w-full rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm
-                  shadow-[0_0_20px_rgba(255,0,255,0.08)]
-                  flex items-center justify-center
-                  h-[64px] sm:h-[90px]
-                "
-              >
-                <span className="text-xs text-white/60">Carregando anúncio…</span>
-                <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-              </div>
+                label="Publicidade"
+                variant="leaderboard"
+                className="w-full"
+              />
             </div>
           </div>
         </div>
       </section>
-
-      {/* Script local só para o LeaderboardTop (Content1..9 já vem do layout) */}
-      <Script id="gpt-leaderboardtop" strategy="afterInteractive">
-        {`
-          (function(){
-            window.googletag = window.googletag || { cmd: [] };
-            if (window.__gptLBOnce) return; window.__gptLBOnce = true;
-
-            googletag.cmd.push(function() {
-              try {
-                var lbMapping = googletag.sizeMapping()
-                  .addSize([0,0],     [[320,100],[320,50]])
-                  .addSize([728,0],   [[728,90]])
-                  .build();
-
-                var el = document.getElementById('LeaderboardTop');
-                if (el) {
-                  var slotLB = googletag.defineSlot(
-                    '/23287346478/lumina.marciobevervanso/lumina.marciobevervanso_LeaderboardTop',
-                    [[728,90],[320,100],[320,50]],
-                    'LeaderboardTop'
-                  );
-                  if (slotLB) {
-                    slotLB.defineSizeMapping(lbMapping)
-                         .setCollapseEmptyDiv(true)
-                         .addService(googletag.pubads());
-                  }
-                  googletag.enableServices();
-                  googletag.display('LeaderboardTop');
-                }
-              } catch(e) {}
-            });
-          })();
-        `}
-      </Script>
 
       {/* Grade (sem lateral) + 1 ad nativo misturado */}
       <section className="pb-10">
@@ -180,24 +152,12 @@ export default async function PerfisPage({ searchParams }: Props) {
               {grid.map((item, i) => (
                 <div key={i} className="card-aspect">
                   {item.kind === 'ad' ? (
-                    <div className="profile-card-business relative" data-ad-slot="Content3">
-                      <div className="pc-media">
-                        {/* o card é 3:4 — mantemos o container com mesmo visual das capas */}
-                        <div
-                          id="Content3"
-                          className="absolute inset-0 m-3 rounded-lg border border-white/10 bg-white/5 flex items-center justify-center backdrop-blur-sm shadow-[0_0_20px_rgba(255,0,255,0.08)]"
-                        >
-                          <span className="text-xs text-white/60">Carregando anúncio…</span>
-                          <noscript>Ative o JavaScript para ver o anúncio.</noscript>
-                        </div>
-                        <div className="pc-gradient" />
-                      </div>
-                      <div className="pc-body">
-                        <div className="text-[11px] uppercase tracking-wider text-neutral-400">Publicidade</div>
-                        <div className="pc-name">Conteúdo patrocinado</div>
-                        <div className="pc-headline">Anúncio exibido automaticamente pelo Google Ad Manager.</div>
-                      </div>
-                    </div>
+                    <AdSlot
+                      id="Content3"
+                      label="Publicidade"
+                      variant="native-card"
+                      className="h-full w-full"
+                    />
                   ) : (
                     <ProfileCard p={mapToCardProps(item.p)} />
                   )}
