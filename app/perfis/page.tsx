@@ -9,12 +9,13 @@ import { listProfiles } from '@/lib/queries'
 
 // OOP (Anchor + Interstitial) por rota
 import RouteOOP from '@/components/RouteOOP'
+
 // VideooWall apenas no client
 import dynamicImport from 'next/dynamic'
 const VideooWall = dynamicImport(() => import('@/components/VideooWall'), { ssr: false })
 
-// Inline ads via componente
-import AdSlot from '@/components/AdSlot'
+// Inline ads (Content1..Content9)
+import InlineAd from '@/components/InlineAd'
 
 export const metadata = {
   title: 'Perfis • LUMINA',
@@ -127,24 +128,20 @@ export default async function PerfisPage({ searchParams }: Props) {
         </div>
       </section>
 
-      {/* Leaderboard superior via componente (substitui Script + div id) */}
+      {/* Top inline ad (usa Content1, igual ao WP) */}
       <section className="section pt-2 pb-4">
         <div className="container">
           <div className="w-full flex justify-center">
             <div className="w-full max-w-6xl flex flex-col items-center">
               <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1">Publicidade</div>
-              <AdSlot
-                id="LeaderboardTop"
-                label="Publicidade"
-                variant="leaderboard"
-                className="w-full"
-              />
+              {/* Content1 no topo (pode atuar como “leaderboard retangular responsivo”) */}
+              <InlineAd id="Content1" />
             </div>
           </div>
         </div>
       </section>
 
-      {/* Grade (sem lateral) + 1 ad nativo misturado */}
+      {/* Grade (sem lateral) + 1 ad inline misturado (Content3) */}
       <section className="pb-10">
         <div className="container">
           {grid.length > 0 ? (
@@ -152,12 +149,7 @@ export default async function PerfisPage({ searchParams }: Props) {
               {grid.map((item, i) => (
                 <div key={i} className="card-aspect">
                   {item.kind === 'ad' ? (
-                    <AdSlot
-                      id="Content3"
-                      label="Publicidade"
-                      variant="native-card"
-                      className="h-full w-full"
-                    />
+                    <InlineAd id="Content3" />
                   ) : (
                     <ProfileCard p={mapToCardProps(item.p)} />
                   )}
